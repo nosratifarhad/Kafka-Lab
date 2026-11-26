@@ -643,7 +643,9 @@ main > .dashboard-internals {
   border-top: 1px solid var(--border);
 }
 
-.record-toolbar {
+.record-toolbar,
+.record-actions,
+.transaction-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -700,6 +702,43 @@ main > .dashboard-internals {
 
 .tracked-record {
   outline: 1px solid var(--accent);
+}
+
+.transaction-controls {
+  margin-top: 14px;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--border);
+}
+
+.transaction-toolbar label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.transaction-toolbar button:disabled {
+  opacity: .5;
+  cursor: default;
+}
+
+#transaction-status {
+  margin: 8px 0 3px;
+  color: var(--accent);
+}
+
+#transaction-replay {
+  margin: 6px 0 0 8px;
+}
+
+.transaction-open,
+.transaction-committing,
+.transaction-aborting {
+  border-color: #b69bf6;
+}
+
+.transaction-aborted {
+  border-color: #ff8998;
 }
 
 .model-note {

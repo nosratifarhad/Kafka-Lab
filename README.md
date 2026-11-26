@@ -34,6 +34,14 @@ python3 -m http.server 8080
 3. Use **Step +1s** or **Run** to see when replication acknowledges the write and which consumer in each group reads it. The partition log marks the record's offset with its trace ID.
 4. Use **Show in topology** to highlight the partition's connections, or **Filter event journal** to see only that record's events.
 
+## Compare transaction isolation
+
+1. In **Internal systems lab → Delivery semantics**, select **Begin transaction** and **Write test batch**. The test batch goes to T0 / P0. To trace a custom record, use **Add to transaction** in **Kafka data → Trace a record**.
+2. Select **Read committed** and step the simulation. In **Partition logs**, compare **HW** (high watermark) with **LSO** (last stable offset). Replication can advance HW while the open transaction holds LSO at its first offset.
+3. Switch to **Read uncommitted**, select **Replay in group 0**, and step again to read the open records. Then abort and replay with **Read committed** to see those offsets skipped. Try committing a new transaction to see its records become readable in both modes.
+
+The lab publishes a commit or abort decision when all participating writes reach their high watermarks. It represents Kafka's transaction markers as metadata on the affected offsets.
+
 ## Where to look
 
 | Panel | What you can inspect or change |
@@ -71,3 +79,4 @@ Kafka Visual Lab uses a simplified, discrete model of Kafka behavior. Counters a
 | [`lab.js`](lab.js) | Internal pipelines, transaction experiments, and interactive controls |
 | [`monitoring.js`](monitoring.js) | Lag sampling, chart interaction, and event journal |
 | [`record-trace.js`](record-trace.js) | Single-record routing, lifecycle timeline, and trace controls |
+| [`transactions.js`](transactions.js) | Transaction lifecycle, last stable offsets, and consumer isolation |
