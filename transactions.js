@@ -139,6 +139,15 @@ const transactions = (() => {
     return isolation.value === 'read_committed' ? lastStableOffset(partition) : partition.hw;
   }
 
+  function skippedRanges(partition) {
+    const gaps = logStorage.gaps(partition);
+    const aborted = isolation.value === 'read_committed'
+      ? partition.transactionRanges?.filter(range => range.marker.state === 'aborted') ?? []
+      : [];
+    if (!aborted.length) return gaps;
+    return gaps.length ? [...aborted, ...gaps].sort((a, b) => a.start - b.start) : aborted;
+  }
+
   function readRecords(partition, position, budget, onRead) {
     const limit = readLimit(partition);
     let consumed = 0;
@@ -152,13 +161,7 @@ const transactions = (() => {
       consumed += count;
     }
 
-    const gaps = logStorage.gaps(partition);
-    const aborted = isolation.value === 'read_committed'
-      ? partition.transactionRanges?.filter(range => range.marker.state === 'aborted') ?? []
-      : [];
-    const skipped = aborted.length && gaps.length ? [...aborted, ...gaps].sort((a, b) => a.start - b.start)
-      : aborted.length ? aborted : gaps;
-    for (const range of skipped) {
+    for (const range of skippedRanges(partition)) {
       if (range.start >= limit) break;
       if (range.end <= position) continue;
       readUntil(range.start);
@@ -220,7 +223,7 @@ const transactions = (() => {
   });
 
   return {
-    canWrite, markWrite, markerAt, advance, prune, readLimit, readRecords, lastStableOffset, reset, updateControls,
+    canWrite, markWrite, markerAt, advance, prune, readLimit, readRecords, skippedRanges, lastStableOffset, reset, updateControls,
     get state() { return current?.marker.state.toUpperCase() ?? 'IDLE'; },
     get count() { return current?.count ?? 0; },
     get committed() { return committed; },

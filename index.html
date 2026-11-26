@@ -222,12 +222,26 @@ main>aside,main>article{min-width:0}
         <div><dt>Average</dt><dd id="lag-average">0</dd></div>
         <div><dt>Peak</dt><dd id="lag-peak">0</dd></div>
       </dl>
-      <div id="lag-plot" class="lag-plot" tabindex="0" role="region" aria-label="Committed lag in records. Use the arrow keys to inspect samples.">
+      <div id="lag-plot" class="lag-plot" tabindex="0" role="region" aria-label="Committed lag in offsets. Use the arrow keys to inspect samples and their breakdown.">
         <svg id="chart" aria-hidden="true"></svg>
         <svg id="lag-crosshair" aria-hidden="true"><line/><circle r="4"/></svg>
         <output id="lag-tooltip" class="lag-tooltip" hidden></output>
       </div>
-      <div class="lag-legend"><span>Committed lag · records</span><small>Simulation time</small></div>
+      <div class="lag-legend"><span>Committed lag · offsets</span><small>Simulation time</small></div>
+      <div class="lag-breakdown">
+        <div class="lag-breakdown-heading">
+          <h3>Lag breakdown</h3>
+          <small id="lag-breakdown-time">Latest</small>
+        </div>
+        <div class="lag-breakdown-bar" id="lag-breakdown-bar" aria-hidden="true"></div>
+        <dl id="lag-breakdown-values">
+          <div data-lag-part="replication" title="Offsets above the high watermark"><dt>Replication</dt><dd>0</dd></div>
+          <div data-lag-part="ready" title="Readable offsets at or after the consumer position"><dt>Ready to read</dt><dd>0</dd></div>
+          <div data-lag-part="commit" title="Available offsets passed by the consumer position since the last commit"><dt>Awaiting commit</dt><dd>0</dd></div>
+          <div data-lag-part="transaction" title="Replicated offsets held behind the last stable offset" hidden><dt>Waiting for transaction</dt><dd>0</dd></div>
+          <div data-lag-part="unavailable" title="Offsets before retention, removed by compaction, or skipped by read committed" hidden><dt>Skipped or expired</dt><dd>0</dd></div>
+        </dl>
+      </div>
     </section>
   </div>
   <p class="model-note">Kafka Lab uses a simplified simulation. Timing is illustrative.</p>

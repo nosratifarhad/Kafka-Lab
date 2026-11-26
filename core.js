@@ -174,7 +174,47 @@ function lagByGroup() {
 function lag() {
   return lagByGroup().reduce((total, group) => total + group, 0);
 }
-function render(){consumerMembership.sync();let n=monitoring.addSample(t,lagByGroup());$('clock').textContent='t = '+t+' s';$('pause').textContent=running?'Pause':'Run';$('stats').innerHTML=[['Committed lag',n],['Records retained',P.reduce((total, partition) => total + logStorage.recordCount(partition), 0)],['Brokers online',B.filter(b=>b.online).length+'/'+B.length],['Under replicated',P.filter(p=>p.isr.length<p.replicas.length).length],['Acknowledged',ackCount],['Rejected',rejected],['Pending ACK',P.reduce((a,p)=>a+p.pending.length,0)],['Group state',consumerMembership.summary()]].map(([a,b])=>'<div class="stat"><small>'+a+'</small><strong>'+b+'</strong></div>').join('');drawTopology();drawView();transactions.updateControls();if(typeof renderInternal==='function'&&window.labReady)renderInternal();if(window.labReady)refreshDials()}
+function readableOffsets(start, end, skipped) {
+  let count = end - start;
+  let frontier = start;
+  for (const range of skipped) {
+    if (range.start >= end) break;
+    const from = Math.max(frontier, range.start);
+    const to = Math.min(end, range.end);
+    if (to <= from) continue;
+    count -= to - from;
+    frontier = to;
+  }
+  return count;
+}
+
+function lagBreakdownByGroup() {
+  const groups = Array.from({length: read('groups')}, () => ({
+    replication: 0, ready: 0, commit: 0, transaction: 0, unavailable: 0
+  }));
+  for (const partition of P) {
+    syncGroups(partition);
+    const skipped = transactions.skippedRanges(partition);
+    const readLimit = transactions.readLimit(partition);
+    for (const [group, breakdown] of groups.entries()) {
+      const checkpoint = clamp(partition.comm[group], 0, partition.leo);
+      const retained = clamp(partition.start, checkpoint, partition.leo);
+      const replicated = clamp(partition.hw, retained, partition.leo);
+      const readable = clamp(readLimit, retained, replicated);
+      const position = clamp(partition.pos[group], retained, readable);
+      const ready = readableOffsets(position, readable, skipped);
+      const commit = readableOffsets(retained, position, skipped);
+
+      breakdown.replication += partition.leo - replicated;
+      breakdown.transaction += replicated - readable;
+      breakdown.ready += ready;
+      breakdown.commit += commit;
+      breakdown.unavailable += readable - checkpoint - ready - commit;
+    }
+  }
+  return groups;
+}
+function render(){consumerMembership.sync();let n=monitoring.addSample(t,lagBreakdownByGroup());$('clock').textContent='t = '+t+' s';$('pause').textContent=running?'Pause':'Run';$('stats').innerHTML=[['Committed lag',n],['Records retained',P.reduce((total, partition) => total + logStorage.recordCount(partition), 0)],['Brokers online',B.filter(b=>b.online).length+'/'+B.length],['Under replicated',P.filter(p=>p.isr.length<p.replicas.length).length],['Acknowledged',ackCount],['Rejected',rejected],['Pending ACK',P.reduce((a,p)=>a+p.pending.length,0)],['Group state',consumerMembership.summary()]].map(([a,b])=>'<div class="stat"><small>'+a+'</small><strong>'+b+'</strong></div>').join('');drawTopology();drawView();transactions.updateControls();if(typeof renderInternal==='function'&&window.labReady)renderInternal();if(window.labReady)refreshDials()}
 function recoverAll(){B.forEach(b=>{if(!b.online)toggle(b.id)});log('Recovery started', 'Broker');render()}
 function seekOffsets(){let id='seekPanel';if($(id)){ $(id).remove();return }let max=Math.max(0,...P.map(p=>p.hw));$('nodeDetail').insertAdjacentHTML('afterend','<div class="detail" id="seekPanel"><label>Seek group 0 <input id="seekSlider" type="range" min="0" max="'+max+'" value="0" oninput="document.getElementById(&quot;seekValue&quot;).textContent=this.value"><output id="seekValue">0</output></label><div class="toolbar"><button onclick="doSeek(&quot;earliest&quot;)">Earliest</button><button onclick="doSeek(&quot;latest&quot;)">Latest</button><button onclick="doSeek(document.getElementById(&quot;seekSlider&quot;).value)">Apply offset</button></div></div>');$('seekPanel').scrollIntoView({block:'nearest'})}
 function doSeek(v){for(let p of P)p.pos[0]=v==='earliest'?p.start:v==='latest'?transactions.readLimit(p):clamp(Number(v)||0,p.start,p.hw);log('Seek group 0: '+v, 'Consumer group');$('seekPanel')?.remove();render()}

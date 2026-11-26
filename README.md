@@ -59,6 +59,20 @@ The lab uses round-robin assignment across the online members in each group.
 
 Compaction works on keyed records sent from **Trace a record**. The simulation measures tombstone grace from append time and compacts records below the last stable offset. Consumer lag still measures the distance between offsets, while **Records retained** counts the surviving records.
 
+## Diagnose consumer lag
+
+The **Consumer lag** panel keeps the total trend and shows its breakdown for the latest sample. Hover over the chart or use the arrow keys to see the breakdown at an earlier time.
+
+| Component | What it counts |
+| --- | --- |
+| Replication | Offsets above the high watermark |
+| Ready to read | Readable offsets the consumer position has yet to reach |
+| Awaiting commit | Available offsets between the committed offset and the consumer position |
+| Waiting for transaction | Replicated offsets held behind the last stable offset in **Read committed** mode |
+| Skipped or expired | Offsets before log start, gaps from compaction, and aborted offsets skipped in **Read committed** mode |
+
+The components add up to committed lag for the selected group. Try **Slow replication**, then lower the consumer rate or turn off **Auto commit** to see which component grows.
+
 ## Where to look
 
 | Panel | What you can inspect or change |

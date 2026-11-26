@@ -559,6 +559,72 @@ main > .dashboard-settings {
   content: "";
 }
 
+.lag-breakdown {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.lag-breakdown-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.lag-breakdown h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.lag-breakdown-bar {
+  display: flex;
+  height: 7px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: #26364a;
+}
+
+[data-lag-part="replication"] { --lag-part-color: #f6b868; }
+[data-lag-part="ready"] { --lag-part-color: #7dd3fc; }
+[data-lag-part="commit"] { --lag-part-color: #6ce2ce; }
+[data-lag-part="transaction"] { --lag-part-color: #c4a5ff; }
+[data-lag-part="unavailable"] { --lag-part-color: #a5b8ce; }
+
+.lag-breakdown-bar span {
+  flex-basis: 0;
+  background: var(--lag-part-color);
+}
+
+#lag-breakdown-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr));
+  gap: 8px 12px;
+  margin: 8px 0 0;
+}
+
+#lag-breakdown-values dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+#lag-breakdown-values dt::before {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-inline-end: 5px;
+  border-radius: 2px;
+  background: var(--lag-part-color);
+  content: "";
+}
+
+#lag-breakdown-values dd {
+  margin: 2px 0 0;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
 .dashboard-internals .internav {
   margin-top: 12px;
 }
