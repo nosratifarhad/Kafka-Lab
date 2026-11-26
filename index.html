@@ -75,7 +75,7 @@ main>aside,main>article{min-width:0}
     <div class="topology-heading">
       <div>
         <h2 id="topology-title">Live topology</h2>
-        <small id="topology-help">Drag producers, broker headers, or consumers to arrange the graph. Drag empty space to pan. Click a broker header to stop or recover it.</small>
+        <small id="topology-help">Drag nodes to arrange them and empty space to pan. Click a broker header to toggle it, or select a consumer to manage its membership.</small>
       </div>
       <div class="topology-tools" role="group" aria-label="Topology zoom and layout">
         <button id="topology-zoom-out" class="smallbtn" type="button" aria-label="Zoom out">−</button>
@@ -230,6 +230,7 @@ main>aside,main>article{min-width:0}
   <p class="model-note">Kafka Lab uses a simplified simulation. Timing is illustrative.</p>
 </main>
 <script src="monitoring.js"></script>
+<script src="consumer-groups.js"></script>
 <script src="transactions.js"></script>
 <script src="record-trace.js"></script>
 <script src="core.js"></script>

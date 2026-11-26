@@ -1,5 +1,5 @@
 
-const $=id=>document.getElementById(id), clamp=(v,a,b)=>Math.max(a,Math.min(b,v));let B=[],P=[],t=0,running=false,sent=0,rejected=0,rr=0,tab='logs',epoch=0,s={},selected=null,rebalanceUntil=0,ackCount=0,unacked=0;
+const $=id=>document.getElementById(id), clamp=(v,a,b)=>Math.max(a,Math.min(b,v));let B=[],P=[],t=0,running=false,sent=0,rejected=0,rr=0,tab='logs',s={},selected=null,ackCount=0,unacked=0;
 const cfg=[['brokers','Brokers',3,1,12],['topics','Topics',2,1,6],['parts','Partitions / topic',3,1,12],['rf','Replication factor',3,1,12],['initial','Initial records / partition',8,0,100000]];
 const live=[['producers','Producers',2,0,20],['rate','Produce / producer / sec',5,0,1000],['consumers','Consumers / group',3,0,30],['groups','Consumer groups',1,1,5],['consume','Consume / consumer / sec',3,0,1000],['replicate','Replica fetch / sec',60,0,10000],['minisr','min.insync.replicas',2,1,12],['retention','Retention records',100,1,100000],['commitInterval','Commit interval (s)',5,1,60],['rebalanceDelay','Rebalance delay (s)',2,0,30],['lagTimeout','Replica lag ticks',3,1,60]];
 function fields(arr,where){$(where).innerHTML=arr.map(([id,label,v,min,max])=>'<div class="dialfield"><div class="dialtitle"><label for="'+id+'">'+label+'</label><output id="out-'+id+'">'+v+'</output></div><div class="dialrow"><button class="dial" data-input="'+id+'" aria-label="Adjust '+label+'" style="--angle:0deg"><span></span></button><input id="'+id+'" type="range" min="'+min+'" max="'+max+'" value="'+v+'" step="1"><button class="nudge" onclick="nudge(&quot;'+id+'&quot;,-1)">−</button><button class="nudge" onclick="nudge(&quot;'+id+'&quot;,1)">+</button></div></div>').join('')}
@@ -12,9 +12,15 @@ function log(message, source = 'Cluster', level = 'info') {
   monitoring.record(t, source, level, message);
 }
 function apply(){s=Object.fromEntries(cfg.map(([id])=>[id,read(id)]));s.rf=Math.min(s.rf,s.brokers);$('rf').value=s.rf;reset()}
-function reset(){running=false;t=sent=rejected=rr=epoch=ackCount=unacked=0;rebalanceUntil=0;selected=null;monitoring.reset();B=Array.from({length:s.brokers},(_,i)=>({id:i,online:true}));P=[];for(let k=0;k<s.topics;k++)for(let i=0;i<s.parts;i++){let replicas=Array.from({length:s.rf},(_,j)=>(i+k+j)%B.length);P.push({topic:k,id:i,replicas,leader:replicas[0],leo:s.initial,start:0,hw:s.initial,offsets:Object.fromEntries(replicas.map(x=>[x,s.initial])),isr:[...replicas],behind:{},pending:[],pos:[],comm:[]})}recordTrace.reset(s.topics);transactions.reset();rebalance();log('Cluster initialized');render()}
+function reset(){running=false;t=sent=rejected=rr=ackCount=unacked=0;selected=null;monitoring.reset();B=Array.from({length:s.brokers},(_,i)=>({id:i,online:true}));P=[];for(let k=0;k<s.topics;k++)for(let i=0;i<s.parts;i++){let replicas=Array.from({length:s.rf},(_,j)=>(i+k+j)%B.length);P.push({topic:k,id:i,replicas,leader:replicas[0],leo:s.initial,start:0,hw:s.initial,offsets:Object.fromEntries(replicas.map(x=>[x,s.initial])),isr:[...replicas],behind:{},pending:[],pos:[],comm:[]})}recordTrace.reset(s.topics);transactions.reset();consumerMembership.reset();log('Cluster initialized');render()}
 function syncGroups(p){for(let g=0;g<read('groups');g++){if(p.pos[g]===undefined)p.pos[g]=p.comm[g]=p.start}}
-function rebalance(){epoch++;rebalanceUntil=t+read('rebalanceDelay');P.forEach(syncGroups);log('Group generation '+epoch+': partitions assigned across '+read('consumers')+' consumers', 'Consumer group')}
+function rebalance() {
+  consumerMembership.sync(true);
+}
+function toggleConsumer(group, consumer) {
+  consumerMembership.toggle(group, consumer);
+  render();
+}
 function elect(p){if(p.leader!==null&&B[p.leader].online)return;let n=p.isr.find(x=>B[x].online);if(n===undefined){p.leader=null;return}p.leader=n;p.leo=p.offsets[n];p.hw=Math.min(p.hw,p.leo);p.pending=p.pending.filter(x=>x<=p.leo);for(let b of p.replicas)p.offsets[b]=Math.min(p.offsets[b],p.leo);recordTrace.prune(p);transactions.prune(p);log('Leader elected B'+n+' for T'+p.topic+'/P'+p.id, 'Controller')}
 function toggle(i){B[i].online=!B[i].online;log('Broker '+i+(B[i].online?' recovered':' stopped'), 'Broker', B[i].online?'info':'warn');P.forEach(p=>{if(!B[i].online){elect(p);p.isr=p.isr.filter(x=>x!==i)}else{if(p.offsets[i]>=p.hw&&p.replicas.includes(i)&&!p.isr.includes(i))p.isr.push(i);elect(p)} });render()}
 function hashKey(key) {
@@ -57,8 +63,20 @@ function produce(n) {
   if (n) log('Produce ' + accepted + '/' + n + ' appended; acks=' + acks, 'Producer',
     accepted === 0 ? 'error' : accepted < n ? 'warn' : 'info');
 }
-function commit(){P.forEach(p=>{syncGroups(p);p.comm=[...p.pos]});log('Offsets committed to __consumer_offsets', 'Consumer group')}
-function restart(){P.forEach(p=>p.pos=[...p.comm]);rebalance();log('Consumer resumed at committed offsets', 'Consumer group')}
+function commit() {
+  let assigned = false;
+  for (const group of consumerMembership.groups) {
+    for (let index = 0; index < P.length; index++) {
+      if (consumerMembership.owner(group.id, index) === null) continue;
+      const partition = P[index];
+      syncGroups(partition);
+      partition.comm[group.id] = partition.pos[group.id];
+      assigned = true;
+    }
+  }
+  if (assigned) log('Offsets committed to __consumer_offsets', 'Consumer group');
+}
+function restart(){P.forEach(p=>p.pos=[...p.comm]);rebalance();log('Consumer positions restored from committed offsets', 'Consumer group')}
 function retain() {
   const retention = read('retention');
   for (const partition of P) {
@@ -92,16 +110,16 @@ function replicatePartition(partition, fetchRate, lagTimeout, minIsr) {
 }
 
 function consumePartitions() {
-  const consumers = read('consumers');
-  const groups = read('groups');
   const limit = read('consume');
   let processed = 0;
-  for (let group = 0; group < groups; group++) {
-    for (let consumer = 0; consumer < consumers; consumer++) {
+  for (const {id: group, members, rebalanceAt} of consumerMembership.groups) {
+    if (rebalanceAt !== null) continue;
+    for (let consumer = 0; consumer < members.length; consumer++) {
+      if (!members[consumer]) continue;
       let budget = limit;
       for (let j = 0; j < P.length; j++) {
         const index = (j + t) % P.length;
-        if (index % consumers !== consumer) continue;
+        if (consumerMembership.owner(group, index) !== consumer) continue;
         const partition = P[index];
         if (partition.leader === null) continue;
         if (partition.pos[group] < partition.start) {
@@ -120,6 +138,7 @@ function consumePartitions() {
 }
 
 function step() {
+  consumerMembership.sync();
   t++;
   produce(read('producers') * read('rate'));
   const fetchRate = read('replicate');
@@ -132,11 +151,9 @@ function step() {
   }
 
   transactions.advance();
-  let processed = 0;
-  if (t >= rebalanceUntil) {
-    processed = consumePartitions();
-    if ($('auto').checked && t % read('commitInterval') === 0) commit();
-  }
+  consumerMembership.advance();
+  const processed = consumePartitions();
+  if ($('auto').checked && t % read('commitInterval') === 0) commit();
   render();
   return processed;
 }
@@ -153,7 +170,7 @@ function lagByGroup() {
 function lag() {
   return lagByGroup().reduce((total, group) => total + group, 0);
 }
-function render(){let n=monitoring.addSample(t,lagByGroup());$('clock').textContent='t = '+t+' s';$('pause').textContent=running?'Pause':'Run';$('stats').innerHTML=[['Committed lag',n],['Records retained',P.reduce((a,p)=>a+p.leo-p.start,0)],['Brokers online',B.filter(b=>b.online).length+'/'+B.length],['Under replicated',P.filter(p=>p.isr.length<p.replicas.length).length],['Acknowledged',ackCount],['Rejected',rejected],['Pending ACK',P.reduce((a,p)=>a+p.pending.length,0)],['Group state',t<rebalanceUntil?'Rebalancing':'Stable']].map(([a,b])=>'<div class="stat"><small>'+a+'</small><strong>'+b+'</strong></div>').join('');drawTopology();drawView();transactions.updateControls();if(typeof renderInternal==='function'&&window.labReady)renderInternal();if(window.labReady)refreshDials()}
+function render(){consumerMembership.sync();let n=monitoring.addSample(t,lagByGroup());$('clock').textContent='t = '+t+' s';$('pause').textContent=running?'Pause':'Run';$('stats').innerHTML=[['Committed lag',n],['Records retained',P.reduce((a,p)=>a+p.leo-p.start,0)],['Brokers online',B.filter(b=>b.online).length+'/'+B.length],['Under replicated',P.filter(p=>p.isr.length<p.replicas.length).length],['Acknowledged',ackCount],['Rejected',rejected],['Pending ACK',P.reduce((a,p)=>a+p.pending.length,0)],['Group state',consumerMembership.summary()]].map(([a,b])=>'<div class="stat"><small>'+a+'</small><strong>'+b+'</strong></div>').join('');drawTopology();drawView();transactions.updateControls();if(typeof renderInternal==='function'&&window.labReady)renderInternal();if(window.labReady)refreshDials()}
 function recoverAll(){B.forEach(b=>{if(!b.online)toggle(b.id)});log('Recovery started', 'Broker');render()}
 function seekOffsets(){let id='seekPanel';if($(id)){ $(id).remove();return }let max=Math.max(0,...P.map(p=>p.hw));$('nodeDetail').insertAdjacentHTML('afterend','<div class="detail" id="seekPanel"><label>Seek group 0 <input id="seekSlider" type="range" min="0" max="'+max+'" value="0" oninput="document.getElementById(&quot;seekValue&quot;).textContent=this.value"><output id="seekValue">0</output></label><div class="toolbar"><button onclick="doSeek(&quot;earliest&quot;)">Earliest</button><button onclick="doSeek(&quot;latest&quot;)">Latest</button><button onclick="doSeek(document.getElementById(&quot;seekSlider&quot;).value)">Apply offset</button></div></div>');$('seekPanel').scrollIntoView({block:'nearest'})}
 function doSeek(v){for(let p of P)p.pos[0]=v==='earliest'?p.start:v==='latest'?transactions.readLimit(p):clamp(Number(v)||0,p.start,p.hw);log('Seek group 0: '+v, 'Consumer group');$('seekPanel')?.remove();render()}
@@ -318,11 +335,11 @@ function drawTopology() {
     return;
   }
   topologyRedrawPending = false;
-  const consumers = read('consumers');
-  const groups = read('groups');
+  const groups = consumerMembership.groups.length;
+  const consumers = consumerMembership.groups[0]?.members.length ?? 0;
   const producers = read('producers');
   const producing = read('rate') > 0;
-  const consuming = t >= rebalanceUntil && read('consume') > 0;
+  const consuming = read('consume') > 0;
   const columns = Math.min(3, B.length);
   const brokerWidth = 226;
   const brokerGap = 24;
@@ -356,6 +373,7 @@ function drawTopology() {
     selected = null;
   }
   const activeNode = document.activeElement?.dataset.topologyNode;
+  const memberActionFocused = document.activeElement?.id === 'consumer-member-action';
   const nodeIsSelected = (kind, i, j) => selected?.kind === kind && selected.i === i && selected.j === j;
   function layoutAttributes(owner) {
     return 'data-topology-layout="' + owner + '" transform="' + topologyTransform(topologyOffset(owner)) + '"';
@@ -438,12 +456,15 @@ function drawTopology() {
     for (let i = 0; i < consumers; i++) {
       const owner = 'consumer-' + i + '-' + group;
       const y = firstRow + (group * consumers + i) * nodeStride;
-      const assigned = P.filter((_, index) => index % consumers === i).length;
+      const membership = consumerMembership.groups[group];
+      const online = membership.members[i];
+      const assigned = membership.owners.filter(owner => owner === i).length;
+      const subtitle = !online ? 'Stopped' : membership.rebalanceAt !== null ? 'Rebalancing' : assigned + ' partitions';
       const label = 'Group ' + group + ' / Consumer ' + i;
       registerNode(owner, consumerX, y, clientWidth, 44);
       clients.set(owner, {owner, left: consumerX, right: consumerX + clientWidth, y: y + 22});
       nodes.push(box(consumerX, y, clientWidth, 'G' + group + ' / C' + i,
-        t < rebalanceUntil ? 'Rebalancing' : assigned + ' partitions', '#7dd3fc',
+        subtitle, online ? '#7dd3fc' : '#fb7185',
         nodeAttributes('consumer', i, group, 'Inspect ' + label, 'selectNode(&quot;consumer&quot;,' + i + ',' + group + ')', owner)));
     }
   }
@@ -457,8 +478,8 @@ function drawTopology() {
       connect('replica', leader, follower, true, partitionSelected);
     }
     for (let group = 0; group < groups; group++) {
-      if (!consumers) continue;
-      const owner = index % consumers;
+      const owner = consumerMembership.owner(group, index);
+      if (owner === null) continue;
       connect('consume', leader, clients.get('consumer-' + owner + '-' + group),
         consuming, partitionSelected || nodeIsSelected('consumer', owner, group));
     }
@@ -497,11 +518,18 @@ function drawTopology() {
       '</span></div>LEO is the next write offset; HW is the replicated boundary; ISR is the in-sync replica set.' +
       (partition.transactionRanges?.length ? ' LSO is the read committed boundary.' : '');
   } else if (kind === 'consumer') {
-    const own = P.filter((_, index) => index % consumers === i);
-    detail.innerHTML = '<b>Group ' + j + ' / Consumer ' + i + '</b><br>Assigned: ' +
-      (own.map(partition => 'T' + partition.topic + '/P' + partition.id).join(', ') || 'none') + '<br>Lag: ' +
-      own.reduce((total, partition) => total + Math.max(0, partition.leo - (partition.comm[j] ?? 0)), 0) +
-      '<br>Each partition has at most one owner per group.';
+    const group = consumerMembership.groups[j];
+    const online = group.members[i];
+    const own = P.filter((_, index) => consumerMembership.owner(j, index) === i);
+    const state = !online ? 'Stopped' : group.rebalanceAt !== null ? 'Rebalancing' : 'Online';
+    const countdown = group.rebalanceAt === null ? '' : ' · Group rebalance in ' + (group.rebalanceAt - t) + 's';
+    detail.innerHTML = '<div class="consumer-detail-heading"><b>Group ' + j + ' / Consumer ' + i + '</b>' +
+      '<button type="button" id="consumer-member-action" class="smallbtn" onclick="toggleConsumer(' + j + ',' + i + ')">' +
+      (online ? 'Stop consumer' : 'Resume consumer') + '</button></div>' +
+      '<span class="' + (online ? 'muted' : 'bad') + '">' + state + countdown + '</span><br>Assigned: ' +
+      (own.map(partition => 'T' + partition.topic + '/P' + partition.id).join(', ') || 'none') +
+      '<br>Assigned lag: ' + own.reduce((total, partition) => total + Math.max(0, partition.leo - (partition.comm[j] ?? 0)), 0);
+    if (memberActionFocused) $('consumer-member-action').focus({preventScroll: true});
   } else {
     detail.innerHTML = '<b>Producer ' + i + '</b><br>acks=' + $('acks').value + ' · ' + read('rate') +
       ' records/s<br>Producers use metadata to locate the partition leader.';
@@ -527,7 +555,22 @@ function partitionLogBlock(partition, offset) {
     (transaction ? ' transaction-' + transaction.state : '') + '">' + offset +
     (trace ? ' · ' + trace.id : '') + label + '</span>';
 }
-function drawView(){let v=$('view');if(tab==='logs')v.innerHTML=P.map(p=>'<div class="partition"><strong>Topic '+p.topic+' / Partition '+p.id+'</strong> <small>LEO '+p.leo+' · HW '+p.hw+transactionMetric(p, ' · LSO ')+' · Start '+p.start+'</small><div class="blocks">'+Array.from({length:Math.min(24,p.leo-p.start)},(_,i)=>{let o=Math.max(p.start,p.leo-24)+i;return partitionLogBlock(p, o)}).join('')+'</div><small>Green: below group 0 commit · blue: below HW · amber: at or above HW</small></div>').join('');if(tab==='groups')v.innerHTML=Array.from({length:read('groups')},(_,g)=>'<h3>Group '+g+' · generation '+epoch+'</h3><table><tr><th>Partition</th><th>Owner</th><th>Position</th><th>Commit</th><th>Lag</th></tr>'+P.map((p,i)=>'<tr><td>T'+p.topic+'/P'+p.id+'</td><td>'+(read('consumers')?'C'+i%read('consumers'):'unassigned')+'</td><td>'+p.pos[g]+'</td><td>'+p.comm[g]+'</td><td>'+Math.max(0,p.leo-p.comm[g])+'</td></tr>').join('')+'</table>').join('');if(tab==='replicas')v.innerHTML='<table><tr><th>Partition</th><th>Leader</th><th>ISR</th><th>Replica LEO</th><th>HW</th></tr>'+P.map(p=>'<tr><td>T'+p.topic+'/P'+p.id+'</td><td>'+ (p.leader===null?'NONE':'B'+p.leader)+'</td><td>'+p.isr.join(', ')+'</td><td>'+p.replicas.map(b=>'B'+b+': '+p.offsets[b]).join(' / ')+'</td><td>'+p.hw+transactionMetric(p, ' · LSO ')+'</td></tr>').join('')+'</table>';if(tab==='protocol')v.innerHTML='<div class="hint"><h3>Protocol flow Kafka</h3><div dir="ltr" class="detail">Metadata request · Producer → Controller metadata via Broker<br>Produce request · Producer → Partition Leader<br>Replica Fetch · Follower → Leader<br>Produce response · Leader → Producer (acks)<br>FindCoordinator · Consumer → Broker<br>JoinGroup / SyncGroup · Consumer → Coordinator<br>Fetch · Consumer → Leader (up to HW)<br>OffsetCommit · Consumer → __consumer_offsets</div><h3>ACK versus offset commit</h3><p>ACK confirms a write; offset commit checkpoints consumer progress. Reduce replication speed to observe pending ACKs.</p></div>';if(tab==='internals')v.innerHTML='<div class="hint">'+lessons.map(([h,b])=>'<h3>'+h+'</h3><p>'+b+'</p>').join('')+'</div>'}
+function consumerGroupTable() {
+  return consumerMembership.groups.map(group => {
+    const online = group.members.filter(Boolean).length;
+    const rows = P.map((partition, index) => {
+      const owner = consumerMembership.owner(group.id, index);
+      return '<tr><td>T' + partition.topic + '/P' + partition.id + '</td><td>' +
+        (owner === null ? '—' : 'C' + owner) + '</td><td>' +
+        partition.pos[group.id] + '</td><td>' + partition.comm[group.id] + '</td><td>' +
+        Math.max(0, partition.leo - partition.comm[group.id]) + '</td></tr>';
+    }).join('');
+    return '<h3>Group ' + group.id + ' · ' + consumerMembership.status(group) +
+      ' · generation ' + group.generation + ' · ' + online + '/' + group.members.length + ' online</h3>' +
+      '<table><tr><th>Partition</th><th>Owner</th><th>Position</th><th>Commit</th><th>Lag</th></tr>' + rows + '</table>';
+  }).join('');
+}
+function drawView(){let v=$('view');if(tab==='logs')v.innerHTML=P.map(p=>'<div class="partition"><strong>Topic '+p.topic+' / Partition '+p.id+'</strong> <small>LEO '+p.leo+' · HW '+p.hw+transactionMetric(p, ' · LSO ')+' · Start '+p.start+'</small><div class="blocks">'+Array.from({length:Math.min(24,p.leo-p.start)},(_,i)=>{let o=Math.max(p.start,p.leo-24)+i;return partitionLogBlock(p, o)}).join('')+'</div><small>Green: below group 0 commit · blue: below HW · amber: at or above HW</small></div>').join('');if(tab==='groups')v.innerHTML=consumerGroupTable();if(tab==='replicas')v.innerHTML='<table><tr><th>Partition</th><th>Leader</th><th>ISR</th><th>Replica LEO</th><th>HW</th></tr>'+P.map(p=>'<tr><td>T'+p.topic+'/P'+p.id+'</td><td>'+ (p.leader===null?'NONE':'B'+p.leader)+'</td><td>'+p.isr.join(', ')+'</td><td>'+p.replicas.map(b=>'B'+b+': '+p.offsets[b]).join(' / ')+'</td><td>'+p.hw+transactionMetric(p, ' · LSO ')+'</td></tr>').join('')+'</table>';if(tab==='protocol')v.innerHTML='<div class="hint"><h3>Protocol flow Kafka</h3><div dir="ltr" class="detail">Metadata request · Producer → Controller metadata via Broker<br>Produce request · Producer → Partition Leader<br>Replica Fetch · Follower → Leader<br>Produce response · Leader → Producer (acks)<br>FindCoordinator · Consumer → Broker<br>JoinGroup / SyncGroup · Consumer → Coordinator<br>Fetch · Consumer → Leader (up to HW)<br>OffsetCommit · Consumer → __consumer_offsets</div><h3>ACK versus offset commit</h3><p>ACK confirms a write; offset commit checkpoints consumer progress. Reduce replication speed to observe pending ACKs.</p></div>';if(tab==='internals')v.innerHTML='<div class="hint">'+lessons.map(([h,b])=>'<h3>'+h+'</h3><p>'+b+'</p>').join('')+'</div>'}
 const lessons=[['Log and offsets','Each partition is an ordered append-only log. Offsets are local to a partition. Consuming records does not delete them.'],['Leader, follower, ISR','Producers append to the leader. Followers fetch from the leader. ISR tracks replicas sufficiently caught up for safe election.'],['High watermark','Consumers normally read only records below the high watermark.'],['Consumer groups','Each partition has one owner per group. Position and committed offset differ; restart can replay records.'],['Acknowledgments','acks=all requires sufficient in-sync replicas. acks=0 does not wait for a response.'],['Retention','Kafka removes data independently of consumer progress; real retention uses segment age and size.'],['KRaft','Controllers replicate metadata and elect leaders. Losing controller quorum prevents metadata changes.'],['Model scope','Internal pipelines use simplified logical counters and demonstrate causal relationships, not physical Kafka timing.']];
 const scenarios=[['Lag growing',()=>{$('rate').value=30;$('consume').value=2}],['Catch up',()=>{$('rate').value=0;$('consume').value=50}],['Slow replication',()=>{$('replicate').value=1;$('rate').value=30}],['Leader failure',()=>{let p=P.find(p=>p.leader!==null);if(p)toggle(p.leader)}],['Replay after restart',()=>{$('auto').checked=false;restart()}],['ACK blocked by ISR',()=>{$('acks').value='all';$('minisr').value=s.rf;let b=B.find(b=>b.online);if(b)toggle(b.id)}],['Uncommitted replay',()=>{$('auto').checked=false;restart()}],['More consumers',()=>{$('consumers').value=read('consumers')+2;rebalance()}]];
 const experimentSelect = $('scenarios');
@@ -540,9 +583,6 @@ $('experiment-form').addEventListener('submit', event => {
 });
 $('config').addEventListener('change', () => apply());
 $('flow-settings').addEventListener('change', () => render());
-$('live').addEventListener('change', event => {
-  if (['groups', 'consumers'].includes(event.target.id)) rebalance();
-  render();
-});
+$('live').addEventListener('change', render);
 apply();
 setInterval(() => { if (running) step(); }, 1000);

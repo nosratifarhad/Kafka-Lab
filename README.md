@@ -42,6 +42,14 @@ python3 -m http.server 8080
 
 The lab publishes a commit or abort decision when all participating writes reach their high watermarks. It represents Kafka's transaction markers as metadata on the affected offsets.
 
+## Watch a consumer group rebalance
+
+1. Advance until the group is **Stable**, then select a consumer in **Live topology** and note its assigned partitions.
+2. Select **Stop consumer** and step through the rebalance delay. Only that group pauses. The topology reconnects each partition to its new owner when the next generation starts.
+3. Check **Kafka data → Consumer groups** for owners, positions, and committed offsets. A partition that moves to a new owner resumes from its committed offset, so it can replay uncommitted work. Select **Resume consumer** to bring the member back.
+
+The lab uses round-robin assignment across the online members in each group.
+
 ## Where to look
 
 | Panel | What you can inspect or change |
@@ -80,3 +88,4 @@ Kafka Visual Lab uses a simplified, discrete model of Kafka behavior. Counters a
 | [`monitoring.js`](monitoring.js) | Lag sampling, chart interaction, and event journal |
 | [`record-trace.js`](record-trace.js) | Single-record routing, lifecycle timeline, and trace controls |
 | [`transactions.js`](transactions.js) | Transaction lifecycle, last stable offsets, and consumer isolation |
+| [`consumer-groups.js`](consumer-groups.js) | Group membership, rebalance timing, and partition ownership |
