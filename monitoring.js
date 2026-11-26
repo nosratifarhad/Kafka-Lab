@@ -20,6 +20,15 @@ const monitoring = (() => {
   const levels = {info: 'Info', warn: 'Warn', error: 'Error'};
   const historyLimit = 901;
   const eventLimit = 500;
+  const breakdownBar = byId('lag-breakdown-bar');
+  const breakdownTime = byId('lag-breakdown-time');
+  const breakdownRows = [...byId('lag-breakdown-values').children].map(row => {
+    const key = row.dataset.lagPart;
+    const segment = document.createElement('span');
+    segment.dataset.lagPart = key;
+    breakdownBar.append(segment);
+    return {key, row, segment, value: row.querySelector('dd'), optional: row.hidden};
+  });
 
   let samples = [];
   let chartPoints = [];
@@ -46,7 +55,9 @@ const monitoring = (() => {
   }
 
   function addSample(time, groups) {
-    const sample = {time, groups, total: groups.reduce((sum, lag) => sum + lag, 0)};
+    const total = Object.fromEntries(breakdownRows.map(({key}) =>
+      [key, groups.reduce((sum, breakdown) => sum + breakdown[key], 0)]));
+    const sample = {time, groups, total};
     if (samples.at(-1)?.time === time) {
       samples[samples.length - 1] = sample;
     } else {
@@ -55,7 +66,11 @@ const monitoring = (() => {
     }
     updateGroupOptions(groups.length);
     renderChart();
-    return sample.total;
+    return totalLag(total);
+  }
+
+  function totalLag(breakdown) {
+    return Object.values(breakdown).reduce((sum, amount) => sum + amount, 0);
   }
 
   function axisStep(maximum) {
@@ -70,10 +85,12 @@ const monitoring = (() => {
     const start = Math.max(0, end - Number(rangeSelect.value));
     const domainEnd = Math.max(start + 10, end);
     const group = groupSelect.value;
-    const values = samples.filter(sample => sample.time >= start).map(sample => ({
-      time: sample.time,
-      lag: group === 'all' ? sample.total : sample.groups[Number(group)]
-    })).filter(sample => sample.lag !== undefined);
+    const values = [];
+    for (const sample of samples) {
+      if (sample.time < start) continue;
+      const breakdown = group === 'all' ? sample.total : sample.groups[Number(group)];
+      if (breakdown) values.push({time: sample.time, lag: totalLag(breakdown), breakdown});
+    }
 
     const maximum = Math.max(0, ...values.map(sample => sample.lag));
     const mean = values.reduce((sum, sample) => sum + sample.lag, 0) / Math.max(1, values.length);
@@ -147,6 +164,7 @@ const monitoring = (() => {
     selectedTime = point?.time ?? null;
     tooltip.hidden = !point;
     crosshair.classList.toggle('active', Boolean(point));
+    renderBreakdown(point);
     if (!point) return;
     const line = crosshair.querySelector('line');
     line.setAttribute('x1', point.x);
@@ -154,7 +172,19 @@ const monitoring = (() => {
     const dot = crosshair.querySelector('circle');
     dot.setAttribute('cx', point.x);
     dot.setAttribute('cy', point.y);
-    tooltip.textContent = simTime(point.time, true) + ' · ' + number.format(point.lag) + ' records';
+    tooltip.textContent = simTime(point.time, true) + ' · ' + number.format(point.lag) + ' offsets';
+  }
+
+  function renderBreakdown(point) {
+    const breakdown = (point ?? chartPoints.at(-1))?.breakdown;
+    breakdownTime.textContent = point ? simTime(point.time, true) : 'Latest';
+    for (const {key, row, segment, value, optional} of breakdownRows) {
+      const amount = breakdown?.[key] ?? 0;
+      value.textContent = number.format(amount);
+      row.hidden = optional && amount === 0;
+      segment.hidden = amount === 0;
+      segment.style.flexGrow = amount;
+    }
   }
 
   function updateJournalStatus() {

@@ -27,6 +27,52 @@ python3 -m http.server 8080
 | Follow a leader election | Start with the default cluster. Apply **Leader failure** and open **Kafka data → Replication / ISR**. | A broker goes offline. Partitions it led elect an available in-sync replica when controller quorum is present. Search **Event journal** for `Leader elected`. |
 | Put pressure on acknowledgments | With the default cluster configuration, select **Recover all** and set **Produce / producer / sec** to 30. Apply **ACK blocked by ISR** and advance the simulation. | With `acks=all`, a write can be rejected when the in-sync replica count falls below `min.insync.replicas`. Compare **Rejected**, the journal, and the replica state. |
 
+## Follow a record
+
+1. Open **Kafka data → Trace a record**, choose a topic, and enter a value with an optional key.
+2. Select **Send record** to submit one write directly to the simulated leader with the current `acks` setting. A repeated key stays on the same partition within its topic. An empty key uses round robin within that topic.
+3. Use **Step +1s** or **Run** to see when replication acknowledges the write and which consumer in each group reads it. The partition log marks the record's offset with its trace ID.
+4. Use **Show in topology** to highlight the partition's connections, or **Filter event journal** to see only that record's events.
+
+## Compare transaction isolation
+
+1. In **Internal systems lab → Delivery semantics**, select **Begin transaction** and **Write test batch**. The test batch goes to T0 / P0. To trace a custom record, use **Add to transaction** in **Kafka data → Trace a record**.
+2. Select **Read committed** and step the simulation. In **Partition logs**, compare **HW** (high watermark) with **LSO** (last stable offset). Replication can advance HW while the open transaction holds LSO at its first offset.
+3. Switch to **Read uncommitted**, select **Replay in group 0**, and step again to read the open records. Then abort and replay with **Read committed** to see those offsets skipped. Try committing a new transaction to see its records become readable in both modes.
+
+The lab publishes a commit or abort decision when all participating writes reach their high watermarks. It represents Kafka's transaction markers as metadata on the affected offsets.
+
+## Watch a consumer group rebalance
+
+1. Advance until the group is **Stable**, then select a consumer in **Live topology** and note its assigned partitions.
+2. Select **Stop consumer** and step through the rebalance delay. Only that group pauses. The topology reconnects each partition to its new owner when the next generation starts.
+3. Check **Kafka data → Consumer groups** for owners, positions, and committed offsets. A partition that moves to a new owner resumes from its committed offset, so it can replay uncommitted work. Select **Resume consumer** to bring the member back.
+
+The lab uses round-robin assignment across the online members in each group.
+
+## Compare retention and compaction
+
+1. In **Kafka data → Trace a record**, send two different values with the same key and topic. Step to replicate them.
+2. In **Internal systems lab → Storage**, select **Run compaction**. **Partition logs** mark the older version's offset as a gap and show the latest value. The surviving offsets keep their original numbers.
+3. Select **Tombstone (null value)**, send the same key again, and step to replicate it. Run compaction to remove the previous value. Advance through **Tombstone grace** and run compaction again to remove the tombstone.
+4. Use **Run retention** to remove records from the start of each partition log. Compare the **Start** offset with the interior gaps left by compaction.
+
+Compaction works on keyed records sent from **Trace a record**. The simulation measures tombstone grace from append time and compacts records below the last stable offset. Consumer lag still measures the distance between offsets, while **Records retained** counts the surviving records.
+
+## Diagnose consumer lag
+
+The **Consumer lag** panel keeps the total trend and shows its breakdown for the latest sample. Hover over the chart or use the arrow keys to see the breakdown at an earlier time.
+
+| Component | What it counts |
+| --- | --- |
+| Replication | Offsets above the high watermark |
+| Ready to read | Readable offsets the consumer position has yet to reach |
+| Awaiting commit | Available offsets between the committed offset and the consumer position |
+| Waiting for transaction | Replicated offsets held behind the last stable offset in **Read committed** mode |
+| Skipped or expired | Offsets before log start, gaps from compaction, and aborted offsets skipped in **Read committed** mode |
+
+The components add up to committed lag for the selected group. Try **Slow replication**, then lower the consumer rate or turn off **Auto commit** to see which component grows.
+
 ## Where to look
 
 | Panel | What you can inspect or change |
@@ -63,3 +109,7 @@ Kafka Visual Lab uses a simplified, discrete model of Kafka behavior. Counters a
 | [`core.js`](core.js) | Simulation clock, cluster state, records, replication, offsets, and topology |
 | [`lab.js`](lab.js) | Internal pipelines, transaction experiments, and interactive controls |
 | [`monitoring.js`](monitoring.js) | Lag sampling, chart interaction, and event journal |
+| [`record-trace.js`](record-trace.js) | Single-record routing, lifecycle timeline, and trace controls |
+| [`transactions.js`](transactions.js) | Transaction lifecycle, last stable offsets, and consumer isolation |
+| [`consumer-groups.js`](consumer-groups.js) | Group membership, rebalance timing, and partition ownership |
+| [`log-storage.js`](log-storage.js) | Keyed record storage, compaction gaps, and retention |
