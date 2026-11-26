@@ -46,4 +46,41 @@ delivery:[['Producer ID',idempotence?'ENABLED':'DISABLED','Lost-response retry i
 function renderInternal(){if(!$('pipeline'))return;let data=stages();stageIndex=Math.min(stageIndex,data.length-1);$('pipeline').className='pipeline '+(running?'':'paused');$('pipeline').innerHTML=data.map((a,i)=>(i?'<div class="pipewire"></div>':'')+'<button class="stage '+(i===stageIndex?'active':'')+'" onclick="chooseStage('+i+')">'+a[0]+'<strong>'+a[1]+'</strong><small>Inspect</small></button>').join('');let a=data[stageIndex];$('stageInfo').innerHTML='<small>STAGE INSPECTOR</small><h3 style="margin-top:8px">'+a[0]+'</h3><div class="stat"><strong>'+a[1]+'</strong></div><p style="margin-top:12px">'+a[2]+'</p><small>Recent events</small><div class="log">'+trace.map(x=>'<div>'+x.replace(/[<>&]/g,'')+'</div>').join('')+'</div>';if(labMode==='producer')$('stageInfo').innerHTML+='<p>Compressed bytes: '+m('wireBytes').toLocaleString()+' · Retries: '+m('retried')+' · Buffer blocked: '+m('bufferRejected')+'</p>'}
 function chooseStage(i){stageIndex=i;renderInternal()}
 function chooseInternal(mode){labMode=mode;stageIndex=0;$('internav').innerHTML=navs.map(([id,name])=>'<button class="'+(id===mode?'on':'')+'" onclick="chooseInternal(&quot;'+id+'&quot;)">'+name+'</button>').join('');fields(controlSpecs[mode].map(([k,l,min,max])=>['int-'+k,l,internal[k],min,k==='controllerLive'?internal.controllers:max]),'internalcontrols');let actions={producer:'<button onclick="failResponse=true;note(\'Next append response will be lost\');renderInternal()">Lose next response</button>',broker:'<button onclick="diskCount+=cacheCount;cacheCount=0;inc(\'flushes\',1);note(\'Manual disk flush\');renderInternal()">Flush cache</button>',storage:'<button onclick="retain();render()">Run retention</button><button onclick="compact()">Project compaction</button>',consumer:'<button onclick="commit();render()">Commit offsets</button><button onclick="restart();render()">Restart consumer</button><button onclick="seekOffsets()">Seek</button>',kraft:'<button onclick="internal.controllerLive=0;chooseInternal(\'kraft\');note(\'Controller quorum lost\');render()">Stop controllers</button><button onclick="internal.controllerLive=internal.controllers;P.forEach(elect);chooseInternal(\'kraft\');render()">Restore quorum</button>',delivery:'<button onclick="beginTxn()">Begin transaction</button><button onclick="addTxn()">Stage batch</button><button onclick="commitTxn()">Commit</button><button onclick="abortTxn()">Abort</button><button onclick="idempotence=!idempotence;renderInternal()">Toggle idempotence</button><button onclick="readCommitted=!readCommitted;renderInternal()">Toggle isolation</button><button onclick="failResponse=true;note(\'Next response lost\');renderInternal()">Lose response</button>'};$('internalactions').innerHTML=actions[mode];refreshDials();renderInternal()}
+const workspaceTabs = [...document.querySelectorAll('.workspace-tab')];
+
+function chooseWorkspace(nextTab) {
+  if (nextTab.getAttribute('aria-selected') === 'true') return;
+  for (const button of workspaceTabs) {
+    const active = button === nextTab;
+    button.setAttribute('aria-selected', active);
+    button.tabIndex = active ? 0 : -1;
+    $(button.getAttribute('aria-controls')).hidden = !active;
+  }
+  window.scrollTo(0, 0);
+}
+
+const workspaceTabList = document.querySelector('.workspace-tabs');
+workspaceTabList.addEventListener('click', event => {
+  const button = event.target.closest('.workspace-tab');
+  if (button) chooseWorkspace(button);
+});
+workspaceTabList.addEventListener('keydown', event => {
+  const current = workspaceTabs.indexOf(event.target);
+  if (current === -1) return;
+
+  const last = workspaceTabs.length - 1;
+  const destinations = {
+    ArrowRight: current === last ? 0 : current + 1,
+    ArrowLeft: current === 0 ? last : current - 1,
+    Home: 0,
+    End: last
+  };
+  if (!Object.hasOwn(destinations, event.key)) return;
+
+  event.preventDefault();
+  const next = workspaceTabs[destinations[event.key]];
+  chooseWorkspace(next);
+  next.focus();
+});
+
 window.labReady=true;chooseInternal('producer');refreshDials();render();
