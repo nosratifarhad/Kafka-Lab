@@ -4,11 +4,14 @@
 
 Follow a batch from producer to partition leader, watch followers replicate it, and see consumer lag change as offsets are committed. Stop a broker or slow replication, then trace the effects through the topology, partition data, and event journal.
 
+![Kafka Visual Lab dashboard with a selected partition and its producer, replica, and consumer links highlighted](docs/kafka-lab.png)
+
 ## Quick start
 
 1. Download or clone this branch and open [`index.html`](index.html) from your local copy in Chrome or Firefox.
 2. Select **Run** to start the simulation or **Step +1s** to advance one simulated second at a time.
 3. Select a producer, partition replica, or consumer in **Live topology** to highlight its connections. Select a broker header to stop or recover that broker.
+4. Drag a producer, broker header, or consumer to rearrange the graph. You can also focus one of these nodes and use **Shift + arrow keys**. Drag empty space to pan a zoomed graph, or select **Reset layout** to restore the original positions.
 
 The lab uses plain HTML, CSS, and JavaScript and runs directly from the file. To serve it over HTTP instead, run this from the project directory and open [http://localhost:8080](http://localhost:8080).
 

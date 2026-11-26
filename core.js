@@ -42,8 +42,56 @@ function doSeek(v){for(let p of P)p.pos[0]=v==='earliest'?p.start:v==='latest'?p
 function selectNode(kind,i,j){selected={kind,i,j};drawTopology()}
 
 const topologyViewport = $('flow');
+const topologyWidth = 1280;
+const topologyOffsets = new Map();
+let topologyBounds = new Map();
+let topologyEdgesByNode = new Map();
+let topologyHeight = 0;
+let topologyGesture = null;
+let topologyRedrawPending = false;
+let suppressTopologyClick = false;
 let topologyZoom = 1;
 let topologyFit = false;
+
+function topologyOffset(key) {
+  return topologyOffsets.get(key) ?? {x: 0, y: 0};
+}
+
+function boundedTopologyOffset(bounds, x, y) {
+  return {
+    x: clamp(x, 8 - bounds.x, topologyWidth - bounds.x - bounds.width - 8),
+    y: clamp(y, 38 - bounds.y, topologyHeight - bounds.y - bounds.height - 8)
+  };
+}
+
+function topologyTransform({x, y}) {
+  return 'translate(' + x + ' ' + y + ')';
+}
+
+function topologyEdgePath({from, to}) {
+  const start = topologyOffset(from.owner);
+  const end = topologyOffset(to.owner);
+  const forward = from.left + from.right + 2 * start.x <= to.left + to.right + 2 * end.x;
+  const x = (forward ? from.right : from.left) + start.x;
+  const X = (forward ? to.left : to.right) + end.x;
+  const y = from.y + start.y;
+  const Y = to.y + end.y;
+  const middle = (x + X) / 2;
+  return 'M' + x + ' ' + y + ' C' + middle + ' ' + y + ' ' + middle + ' ' + Y + ' ' + X + ' ' + Y;
+}
+
+function moveTopologyNode(key, x, y) {
+  const bounds = topologyBounds.get(key);
+  if (!bounds) return;
+  const offset = boundedTopologyOffset(bounds, x, y);
+  topologyOffsets.set(key, offset);
+  for (const element of topologyViewport.querySelectorAll('[data-topology-layout="' + key + '"]')) {
+    element.setAttribute('transform', topologyTransform(offset));
+  }
+  for (const edge of topologyEdgesByNode.get(key) ?? []) {
+    edge.element.setAttribute('d', topologyEdgePath(edge));
+  }
+}
 
 function updateTopologyZoom() {
   topologyViewport.classList.toggle('fit', topologyFit);
@@ -56,7 +104,7 @@ function updateTopologyZoom() {
 
 function changeTopologyZoom(delta) {
   if (topologyFit) {
-    topologyZoom = clamp(Math.round(Math.min(1, topologyViewport.clientWidth / 1280) * 4) / 4, 0.5, 1);
+    topologyZoom = clamp(Math.round(Math.min(1, topologyViewport.clientWidth / topologyWidth) * 4) / 4, 0.5, 1);
   }
   topologyZoom = clamp(topologyZoom + delta, 0.5, 2);
   topologyFit = false;
@@ -69,21 +117,89 @@ $('topology-fit').addEventListener('click', () => {
   topologyFit = !topologyFit;
   updateTopologyZoom();
 });
+$('topology-reset-layout').addEventListener('click', () => {
+  topologyOffsets.clear();
+  topologyViewport.scrollTo(0, 0);
+  drawTopology();
+});
 $('topology-clear').addEventListener('click', () => {
   selected = null;
   drawTopology();
   topologyViewport.focus({preventScroll: true});
 });
+topologyViewport.addEventListener('pointerdown', event => {
+  if (!event.isPrimary || event.button !== 0) return;
+  suppressTopologyClick = false;
+  const target = event.target.closest('[data-topology-node]');
+  const key = target?.dataset.topologyDrag;
+  if (target && !key) return;
+  if (!target && !event.target.closest('svg')) return;
+  topologyGesture = {
+    id: event.pointerId, key, moved: false, x: event.clientX, y: event.clientY,
+    start: key ? topologyOffset(key) : {x: topologyViewport.scrollLeft, y: topologyViewport.scrollTop},
+    scale: topologyViewport.querySelector('svg').getBoundingClientRect().width / topologyWidth
+  };
+});
+topologyViewport.addEventListener('pointermove', event => {
+  const gesture = topologyGesture;
+  if (gesture?.id !== event.pointerId) return;
+  const dx = event.clientX - gesture.x;
+  const dy = event.clientY - gesture.y;
+  if (!gesture.moved) {
+    if (Math.hypot(dx, dy) < 5) return;
+    gesture.moved = true;
+    topologyViewport.setPointerCapture(event.pointerId);
+    topologyViewport.classList.add('dragging');
+  }
+  if (gesture.key) {
+    moveTopologyNode(gesture.key, gesture.start.x + dx / gesture.scale, gesture.start.y + dy / gesture.scale);
+  } else {
+    topologyViewport.scrollTo(gesture.start.x - dx, gesture.start.y - dy);
+  }
+});
+function finishTopologyGesture(event) {
+  if (topologyGesture?.id !== event.pointerId) return;
+  suppressTopologyClick = topologyGesture.moved;
+  topologyGesture = null;
+  topologyViewport.classList.remove('dragging');
+  if (topologyRedrawPending) {
+    requestAnimationFrame(() => {
+      if (topologyRedrawPending) drawTopology();
+    });
+  }
+}
+topologyViewport.addEventListener('pointercancel', finishTopologyGesture);
+topologyViewport.addEventListener('lostpointercapture', finishTopologyGesture);
+document.addEventListener('pointerup', finishTopologyGesture);
+topologyViewport.addEventListener('click', event => {
+  if (!suppressTopologyClick || !event.detail) return;
+  suppressTopologyClick = false;
+  event.preventDefault();
+  event.stopPropagation();
+}, true);
 topologyViewport.addEventListener('keydown', event => {
   if (event.key === 'Escape' && selected) {
     $('topology-clear').click();
   } else if (event.target.dataset.topologyNode && ['Enter', ' '].includes(event.key)) {
     event.preventDefault();
     event.target.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+  } else if (event.shiftKey && event.target.dataset.topologyDrag) {
+    const directions = {ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1]};
+    if (!Object.hasOwn(directions, event.key)) return;
+    event.preventDefault();
+    const key = event.target.dataset.topologyDrag;
+    const offset = topologyOffset(key);
+    const [dx, dy] = directions[event.key];
+    moveTopologyNode(key, offset.x + dx * 20, offset.y + dy * 20);
   }
 });
 
 function drawTopology() {
+  if (topologyGesture && !topologyGesture.moved) {
+    topologyRedrawPending = true;
+    return;
+  }
+  topologyRedrawPending = false;
   const consumers = read('consumers');
   const groups = read('groups');
   const producers = read('producers');
@@ -101,7 +217,7 @@ function drawTopology() {
   const producerX = 24;
   const consumerX = 1100;
   const clientWidth = 156;
-  const height = Math.max(
+  topologyHeight = Math.max(
     Math.ceil(B.length / columns) * (brokerHeight + 38) + 24,
     Math.max(producers, consumers * groups) * nodeStride + 70,
     440
@@ -109,7 +225,9 @@ function drawTopology() {
   const backgrounds = [];
   const edges = [];
   const nodes = [];
+  const clients = new Map();
   const locations = P.map(() => []);
+  topologyBounds = new Map();
   const markerColors = {produce: '#2dd4bf', consume: '#7dd3fc', replica: '#c4a5ff'};
   const markers = Object.entries(markerColors).map(([kind, color]) =>
     '<marker id="topology-' + kind + '" viewBox="0 0 9 8" refX="8" refY="4" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0 L9 4 L0 8 Z" fill="' + color + '"/></marker>'
@@ -121,10 +239,24 @@ function drawTopology() {
   }
   const activeNode = document.activeElement?.dataset.topologyNode;
   const nodeIsSelected = (kind, i, j) => selected?.kind === kind && selected.i === i && selected.j === j;
-  function nodeAttributes(kind, i, j, label, action) {
+  function layoutAttributes(owner) {
+    return 'data-topology-layout="' + owner + '" transform="' + topologyTransform(topologyOffset(owner)) + '"';
+  }
+  function registerNode(owner, x, y, width, height) {
+    const bounds = {x, y, width, height};
+    topologyBounds.set(owner, bounds);
+    if (topologyOffsets.has(owner)) {
+      const offset = topologyOffset(owner);
+      topologyOffsets.set(owner, boundedTopologyOffset(bounds, offset.x, offset.y));
+    }
+  }
+  function nodeAttributes(kind, i, j, label, action, owner) {
+    const key = kind + '-' + i + '-' + j;
+    const drag = key === owner ? ' data-topology-drag="' + owner +
+      '" aria-keyshortcuts="Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown"' : '';
     return 'class="svgclick' + (nodeIsSelected(kind, i, j) ? ' selected' : '') +
-      '" data-topology-node="' + kind + '-' + i + '-' + j + '" tabindex="0" role="button" aria-label="' +
-      label + '" onclick="' + action + '"';
+      '" data-topology-node="' + key + '" tabindex="0" role="button" aria-label="' +
+      label + '" onclick="' + action + '" ' + layoutAttributes(owner) + drag;
   }
   function box(x, y, width, title, subtitle, color, attributes) {
     return '<g ' + attributes + '><rect x="' + x + '" y="' + y + '" width="' + width +
@@ -134,12 +266,10 @@ function drawTopology() {
       subtitle + '</text></g>';
   }
   function connect(kind, from, to, active, matches) {
-    const middle = (from.x + to.x) / 2;
     const state = selected ? (matches ? ' highlighted' : ' dimmed') : '';
-    const path = 'M' + from.x + ' ' + from.y + ' C' + middle + ' ' + from.y +
-      ' ' + middle + ' ' + to.y + ' ' + to.x + ' ' + to.y;
-    edges.push({highlighted: selected && matches, html: '<path class="edge ' + kind +
-      (active ? ' animated' : '') + state + '" marker-end="url(#topology-' + kind + ')" d="' + path + '"/>'});
+    edges.push({from, to, highlighted: selected && matches, html: '<path class="edge ' + kind +
+      (active ? ' animated' : '') + state + '" marker-end="url(#topology-' + kind + ')" d="' +
+      topologyEdgePath({from, to}) + '"/>'});
   }
 
   nodes.push(
@@ -148,20 +278,22 @@ function drawTopology() {
     '<text x="1100" y="27" class="lane-label">CONSUMERS</text>'
   );
   B.forEach((broker, i) => {
+    const owner = 'broker-' + i + '-0';
     const x = brokerStart + (i % columns) * (brokerWidth + brokerGap);
     const y = firstRow + Math.floor(i / columns) * (brokerHeight + 38);
     const color = broker.online ? '#5eead4' : '#fb7185';
-    backgrounds.push('<rect x="' + x + '" y="' + y + '" width="' + brokerWidth + '" height="' +
+    registerNode(owner, x, y, brokerWidth, brokerHeight);
+    backgrounds.push('<rect ' + layoutAttributes(owner) + ' x="' + x + '" y="' + y + '" width="' + brokerWidth + '" height="' +
       brokerHeight + '" rx="12" fill="#0c1728" stroke="' + (broker.online ? '#405c7b' : color) + '"/>');
     nodes.push(box(x + 7, y + 7, brokerWidth - 14, 'Broker ' + i, broker.online ? 'Online' : 'Offline', color,
-      nodeAttributes('broker', i, 0, (broker.online ? 'Stop' : 'Recover') + ' broker ' + i, 'toggle(' + i + ')')));
+      nodeAttributes('broker', i, 0, (broker.online ? 'Stop' : 'Recover') + ' broker ' + i, 'toggle(' + i + ')', owner)));
     brokerPartitions[i].forEach(({partition, index}, row) => {
       const top = y + 59 + row * 28;
       const leader = partition.leader === i;
       const title = 'T' + partition.topic + ' / P' + partition.id + ' · ' + (leader ? 'Leader' : 'Follower');
       const attributes = nodeAttributes('partition', index, i, title + ' on broker ' + i,
-        'selectNode(&quot;partition&quot;,' + index + ',' + i + ')');
-      locations[index][i] = {left: x + 8, right: x + brokerWidth - 8, y: top + 12};
+        'selectNode(&quot;partition&quot;,' + index + ',' + i + ')', owner);
+      locations[index][i] = {owner, left: x + 8, right: x + brokerWidth - 8, y: top + 12};
       nodes.push('<g ' + attributes + '><rect x="' + (x + 8) + '" y="' + top + '" width="' +
         (brokerWidth - 16) + '" height="24" rx="5" fill="' + (leader ? '#473a19' : '#20324a') +
         '" stroke="' + (leader ? '#fbbf24' : '#405c7b') + '"/><text x="' + (x + 17) + '" y="' +
@@ -170,17 +302,32 @@ function drawTopology() {
     });
   });
   for (let i = 0; i < producers; i++) {
+    const owner = 'producer-' + i + '-0';
     const y = firstRow + i * nodeStride;
+    registerNode(owner, producerX, y, clientWidth, 44);
     nodes.push(box(producerX, y, clientWidth, 'Producer ' + i, read('rate') + ' msg/s', '#5eead4',
-      nodeAttributes('producer', i, 0, 'Inspect producer ' + i, 'selectNode(&quot;producer&quot;,' + i + ',0)')));
+      nodeAttributes('producer', i, 0, 'Inspect producer ' + i, 'selectNode(&quot;producer&quot;,' + i + ',0)', owner)));
     P.forEach((partition, index) => {
       if (partition.leader === null) return;
       const leader = locations[index][partition.leader];
       if (producers <= 5 || index % producers === i || selected?.kind === 'producer' && selected.i === i) {
-        connect('produce', {x: producerX + clientWidth, y: y + 22}, {x: leader.left, y: leader.y},
+        connect('produce', {owner, left: producerX, right: producerX + clientWidth, y: y + 22}, leader,
           producing, selected?.kind === 'partition' && selected.i === index || nodeIsSelected('producer', i, 0));
       }
     });
+  }
+  for (let group = 0; group < groups; group++) {
+    for (let i = 0; i < consumers; i++) {
+      const owner = 'consumer-' + i + '-' + group;
+      const y = firstRow + (group * consumers + i) * nodeStride;
+      const assigned = P.filter((_, index) => index % consumers === i).length;
+      const label = 'Group ' + group + ' / Consumer ' + i;
+      registerNode(owner, consumerX, y, clientWidth, 44);
+      clients.set(owner, {owner, left: consumerX, right: consumerX + clientWidth, y: y + 22});
+      nodes.push(box(consumerX, y, clientWidth, 'G' + group + ' / C' + i,
+        t < rebalanceUntil ? 'Rebalancing' : assigned + ' partitions', '#7dd3fc',
+        nodeAttributes('consumer', i, group, 'Inspect ' + label, 'selectNode(&quot;consumer&quot;,' + i + ',' + group + ')', owner)));
+    }
   }
   P.forEach((partition, index) => {
     if (partition.leader === null) return;
@@ -189,33 +336,28 @@ function drawTopology() {
     for (const broker of partition.replicas) {
       if (broker === partition.leader || !B[broker].online) continue;
       const follower = locations[index][broker];
-      const flowsRight = follower.left >= leader.left;
-      connect('replica', {x: flowsRight ? leader.right : leader.left, y: leader.y},
-        {x: flowsRight ? follower.left : follower.right, y: follower.y}, true, partitionSelected);
+      connect('replica', leader, follower, true, partitionSelected);
     }
     for (let group = 0; group < groups; group++) {
       if (!consumers) continue;
       const owner = index % consumers;
-      connect('consume', {x: leader.right, y: leader.y},
-        {x: consumerX, y: firstRow + (group * consumers + owner) * nodeStride + 22},
+      connect('consume', leader, clients.get('consumer-' + owner + '-' + group),
         consuming, partitionSelected || nodeIsSelected('consumer', owner, group));
     }
   });
-  for (let group = 0; group < groups; group++) {
-    for (let i = 0; i < consumers; i++) {
-      const y = firstRow + (group * consumers + i) * nodeStride;
-      const assigned = P.filter((_, index) => index % consumers === i).length;
-      const label = 'Group ' + group + ' / Consumer ' + i;
-      nodes.push(box(consumerX, y, clientWidth, 'G' + group + ' / C' + i,
-        t < rebalanceUntil ? 'Rebalancing' : assigned + ' partitions', '#7dd3fc',
-        nodeAttributes('consumer', i, group, 'Inspect ' + label, 'selectNode(&quot;consumer&quot;,' + i + ',' + group + ')')));
-    }
-  }
-
   edges.sort((a, b) => Number(a.highlighted) - Number(b.highlighted));
   topologyViewport.classList.toggle('paused', !running);
-  topologyViewport.innerHTML = '<svg viewBox="0 0 1280 ' + height + '" xmlns="http://www.w3.org/2000/svg"><defs>' +
+  topologyViewport.innerHTML = '<svg viewBox="0 0 ' + topologyWidth + ' ' + topologyHeight + '" xmlns="http://www.w3.org/2000/svg"><defs>' +
     markers + '</defs>' + backgrounds.join('') + edges.map(edge => edge.html).join('') + nodes.join('') + '</svg>';
+  topologyEdgesByNode = new Map();
+  topologyViewport.querySelectorAll('.edge').forEach((element, index) => {
+    const edge = edges[index];
+    edge.element = element;
+    for (const owner of [edge.from.owner, edge.to.owner]) {
+      if (!topologyEdgesByNode.has(owner)) topologyEdgesByNode.set(owner, []);
+      topologyEdgesByNode.get(owner).push(edge);
+    }
+  });
   if (activeNode) {
     const replacement = topologyViewport.querySelector('[data-topology-node="' + activeNode + '"]');
     (replacement ?? topologyViewport).focus({preventScroll: true});
