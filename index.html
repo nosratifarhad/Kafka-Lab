@@ -45,6 +45,30 @@ main>aside,main>article{min-width:0}
     <button onclick="recoverAll()">Recover all</button>
   </div>
 
+  <section class="card dashboard-settings" aria-labelledby="settings-title">
+    <h2 id="settings-title">Settings</h2>
+    <div class="settings-groups">
+      <details>
+        <summary>Cluster builder</summary>
+        <div class="settings-group-body">
+          <div id="config"></div>
+          <p><small>Changing a cluster control rebuilds the cluster.</small></p>
+          <button class="primary" onclick="apply()">Rebuild cluster</button>
+        </div>
+      </details>
+      <details>
+        <summary>Traffic settings</summary>
+        <div class="settings-group-body">
+          <div id="live"></div>
+          <div class="toolbar">
+            <button onclick="commit();render()">Commit</button>
+            <button onclick="restart();render()">Restart consumer</button>
+          </div>
+        </div>
+      </details>
+    </div>
+  </section>
+
   <section class="stats" id="stats" aria-label="Cluster metrics"></section>
 
   <section class="card topology-card" aria-labelledby="topology-title">
@@ -89,33 +113,13 @@ main>aside,main>article{min-width:0}
     <div class="detail" id="nodeDetail">Select a partition, producer, or consumer to inspect its state.</div>
   </section>
 
-  <div class="dashboard-summary">
-    <section class="card dashboard-settings" aria-labelledby="settings-title">
-      <h2 id="settings-title">Settings</h2>
-      <details>
-        <summary>Cluster builder</summary>
-        <div id="config"></div>
-        <p><small>Changing a cluster control rebuilds the cluster.</small></p>
-        <button class="primary" onclick="apply()">Rebuild cluster</button>
-      </details>
-      <details>
-        <summary>Traffic settings</summary>
-        <div id="live"></div>
-        <div class="toolbar">
-          <button onclick="commit();render()">Commit</button>
-          <button onclick="restart();render()">Restart consumer</button>
-        </div>
-      </details>
-    </section>
-    <section class="card" aria-labelledby="lag-title">
-      <h2 id="lag-title">Consumer lag</h2>
-      <svg class="chart" id="chart" viewBox="0 0 600 120" preserveAspectRatio="none" role="img" aria-label="Committed consumer lag over time"></svg>
-    </section>
-    <section class="card" aria-labelledby="journal-title">
-      <h2 id="journal-title">Event journal</h2>
-      <div class="log" id="log" tabindex="0" role="region" aria-labelledby="journal-title"></div>
-    </section>
-  </div>
+  <section class="card dashboard-data" aria-labelledby="data-title">
+    <div class="data-heading">
+      <h2 id="data-title">Kafka data</h2>
+      <label for="data-view">View <select id="data-view"></select></label>
+    </div>
+    <div id="view"></div>
+  </section>
 
   <section class="card dashboard-internals" aria-labelledby="internals-title">
     <h2 id="internals-title">Internal systems lab</h2>
@@ -129,13 +133,16 @@ main>aside,main>article{min-width:0}
     <div id="internalactions" class="actionbar"></div>
   </section>
 
-  <section class="card dashboard-data" aria-labelledby="data-title">
-    <div class="data-heading">
-      <h2 id="data-title">Kafka data</h2>
-      <label for="data-view">View <select id="data-view"></select></label>
-    </div>
-    <div id="view"></div>
-  </section>
+  <div class="dashboard-monitoring">
+    <section class="card" aria-labelledby="journal-title">
+      <h2 id="journal-title">Event journal</h2>
+      <div class="log" id="log" tabindex="0" role="region" aria-labelledby="journal-title"></div>
+    </section>
+    <section class="card" aria-labelledby="lag-title">
+      <h2 id="lag-title">Consumer lag</h2>
+      <svg class="chart" id="chart" viewBox="0 0 600 120" preserveAspectRatio="none" role="img" aria-label="Committed consumer lag over time"></svg>
+    </section>
+  </div>
   <p class="model-note">Kafka Lab uses a simplified simulation. Timing is illustrative.</p>
 </main>
 <script src="core.js"></script>

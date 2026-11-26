@@ -97,7 +97,7 @@ summary:focus-visible,
 }
 
 main > .card,
-.dashboard-summary > .card {
+.dashboard-monitoring > .card {
   background: var(--panel);
   border-color: var(--border);
   margin: 0;
@@ -188,26 +188,39 @@ main > .topology-card {
   padding: 0;
 }
 
-.dashboard-summary {
+.settings-groups,
+.dashboard-monitoring {
   display: grid;
-  grid-template-columns: minmax(200px, .75fr) repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
   gap: 12px;
-  margin-block: 12px;
 }
 
-.dashboard-summary h2,
+main > .dashboard-settings {
+  margin-bottom: 12px;
+  padding-block: 12px;
+}
+
+.dashboard-monitoring {
+  margin-top: 12px;
+}
+
+.dashboard-settings h2,
+.dashboard-monitoring h2,
 .dashboard-internals h2,
 .dashboard-data h2 {
   font-size: 19px;
 }
 
 .dashboard-settings details {
-  border-top: 1px solid var(--border);
+  min-width: 0;
+  background: #142338;
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 .dashboard-settings summary {
-  padding-block: 12px;
+  padding: 8px 12px;
   list-style-position: inside;
   cursor: pointer;
 }
@@ -216,20 +229,43 @@ main > .topology-card {
   color: var(--accent);
 }
 
+.settings-group-body {
+  padding: 0 12px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-group-body #config,
+.settings-group-body #live {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 205px), 1fr));
+  gap: 0 14px;
+}
+
+.dashboard-settings .field input,
+.dashboard-settings .field select {
+  width: min(115px, 55%);
+  min-width: 0;
+}
+
+.dashboard-settings .field input[type=checkbox] {
+  width: auto;
+}
+
 .dashboard-settings .toolbar {
   margin-top: 12px;
+  margin-bottom: 0;
 }
 
 .dashboard-settings p {
   margin: 10px 0;
 }
 
-.dashboard-summary .chart,
-.dashboard-summary .log {
+.dashboard-monitoring .chart,
+.dashboard-monitoring .log {
   height: 140px;
 }
 
-.dashboard-summary .log {
+.dashboard-monitoring .log {
   overflow-wrap: anywhere;
 }
 
@@ -241,7 +277,8 @@ main > .topology-card {
   max-height: none;
 }
 
-main > .dashboard-data {
+main > .dashboard-data,
+main > .dashboard-internals {
   margin-top: 12px;
 }
 
@@ -313,19 +350,11 @@ main > .dashboard-data {
   .lab-header {
     padding: 14px 12px;
   }
-
-  .dashboard-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .dashboard-settings {
-    grid-column: 1 / -1;
-  }
 }
 
 @media (max-width: 520px) {
   main > .card,
-  .dashboard-summary > .card {
+  .dashboard-monitoring > .card {
     padding: 12px;
   }
 
@@ -353,7 +382,8 @@ main > .dashboard-data {
     font-size: 10px;
   }
 
-  .dashboard-summary,
+  .dashboard-monitoring,
+  .settings-groups,
   .topology-controls {
     grid-template-columns: minmax(0, 1fr);
   }
