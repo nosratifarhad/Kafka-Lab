@@ -203,6 +203,7 @@ main > .dashboard-settings {
 
 .dashboard-monitoring {
   margin-top: 12px;
+  align-items: stretch;
 }
 
 .dashboard-settings h2,
@@ -260,13 +261,275 @@ main > .dashboard-settings {
   margin: 10px 0;
 }
 
-.dashboard-monitoring .chart,
-.dashboard-monitoring .log {
-  height: 140px;
+.dashboard-monitoring > .monitoring-panel {
+  min-width: 0;
+  background: #111b28;
 }
 
-.dashboard-monitoring .log {
+.monitoring-heading,
+.monitoring-filters,
+.lag-selectors,
+.lag-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.monitoring-heading {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.monitoring-heading h2 {
+  margin: 0;
+}
+
+.monitoring-panel button,
+.monitoring-panel input,
+.monitoring-panel select {
+  padding: 6px 9px;
+  border-color: #37475b;
+  border-radius: 6px;
+  background: #172332;
+  font-size: 13px;
+}
+
+.monitoring-panel button:hover,
+.monitoring-panel button:focus-visible {
+  border-color: var(--accent);
+}
+
+.monitoring-filters {
+  margin-bottom: 10px;
+}
+
+.monitoring-filters input {
+  flex: 1;
+  min-width: 0;
+}
+
+.monitoring-filters input::placeholder {
+  color: var(--muted);
+}
+
+.journal-scroll {
+  height: 272px;
+  overflow: auto;
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
+  border: 1px solid #29394c;
+  border-radius: 7px;
+}
+
+.journal-table {
+  font-size: 13px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.journal-table th,
+.journal-table td {
+  padding: 8px 9px;
+  border-color: #263447;
+  vertical-align: top;
+}
+
+.journal-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #1b2939;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.journal-table tbody tr:nth-child(even) {
+  background: #162231;
+}
+
+.journal-time,
+.journal-level,
+.lag-stats dd,
+.lag-tooltip {
+  font-variant-numeric: tabular-nums;
+}
+
+.journal-time {
+  color: var(--muted);
+  white-space: nowrap;
+  font-family: monospace;
+}
+
+.journal-level,
+.journal-source {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.journal-level {
+  font-weight: 650;
+}
+
+.journal-level.info {
+  color: #9bd4ff;
+  background: #21405a;
+}
+
+.journal-level.warn {
+  color: #ffd388;
+  background: #4a371e;
+}
+
+.journal-level.error {
+  color: #ffb3b7;
+  background: #512a38;
+}
+
+.journal-source {
+  margin-inline-end: 6px;
+  color: #c2cfe0;
+  background: #26364a;
+}
+
+.journal-table td:last-child {
   overflow-wrap: anywhere;
+}
+
+.journal-table .journal-empty,
+.journal-status {
+  color: var(--muted);
+}
+
+.journal-status {
+  display: block;
+  margin-top: 10px;
+}
+
+.lag-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 12px;
+}
+
+.lag-stats div {
+  padding: 7px 10px;
+  border-top: 1px solid #33455a;
+}
+
+.lag-stats dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.lag-stats dd {
+  margin: 2px 0 0;
+  font-size: clamp(16px, 2vw, 22px);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.lag-stats div:first-child dd {
+  color: #6ce2ce;
+}
+
+.lag-plot {
+  position: relative;
+  height: 245px;
+  border-radius: 7px;
+  background: #0d1622;
+  cursor: crosshair;
+}
+
+.lag-plot svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.lag-plot:focus-visible,
+.journal-scroll:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.lag-grid path {
+  stroke: #26364a;
+}
+
+.lag-grid text {
+  fill: #a5b8ce;
+  font: 11px monospace;
+}
+
+.lag-line {
+  fill: none;
+  stroke: #6ce2ce;
+  stroke-width: 2;
+}
+
+.lag-dot,
+#lag-crosshair circle {
+  fill: #6ce2ce;
+}
+
+.lag-area {
+  fill: url(#lag-fill);
+}
+
+#lag-crosshair {
+  visibility: hidden;
+}
+
+#lag-crosshair.active {
+  visibility: visible;
+}
+
+#lag-crosshair line {
+  stroke: #91a8c0;
+  stroke-dasharray: 3 4;
+}
+
+#lag-crosshair circle {
+  stroke: #0d1622;
+  stroke-width: 2;
+}
+
+.lag-tooltip {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 5px 8px;
+  border: 1px solid #42566c;
+  border-radius: 5px;
+  background: #192635;
+  color: #e2e8f0;
+  font: 12px monospace;
+  pointer-events: none;
+}
+
+.lag-legend {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.lag-legend span::before {
+  display: inline-block;
+  width: 13px;
+  height: 2px;
+  margin-inline-end: 7px;
+  background: #6ce2ce;
+  vertical-align: middle;
+  content: "";
 }
 
 .dashboard-internals .internav {
@@ -350,6 +613,10 @@ main > .dashboard-internals {
   .lab-header {
     padding: 14px 12px;
   }
+
+  .dashboard-monitoring {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 520px) {
@@ -382,7 +649,6 @@ main > .dashboard-internals {
     font-size: 10px;
   }
 
-  .dashboard-monitoring,
   .settings-groups,
   .topology-controls {
     grid-template-columns: minmax(0, 1fr);
@@ -414,5 +680,10 @@ main > .dashboard-internals {
   .topology-card .legend {
     font-size: 12px;
     gap: 8px 12px;
+  }
+
+  .journal-table th,
+  .journal-table td {
+    padding-inline: 5px;
   }
 }

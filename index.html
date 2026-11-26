@@ -134,17 +134,56 @@ main>aside,main>article{min-width:0}
   </section>
 
   <div class="dashboard-monitoring">
-    <section class="card" aria-labelledby="journal-title">
-      <h2 id="journal-title">Event journal</h2>
-      <div class="log" id="log" tabindex="0" role="region" aria-labelledby="journal-title"></div>
+    <section class="card monitoring-panel" aria-labelledby="journal-title">
+      <div class="monitoring-heading">
+        <h2 id="journal-title">Event journal</h2>
+        <button type="button" id="journal-pause">Pause feed</button>
+      </div>
+      <div class="monitoring-filters">
+        <input id="journal-search" type="search" aria-label="Search events" placeholder="Search messages or sources">
+        <select id="journal-level" aria-label="Event severity">
+          <option value="">All levels</option>
+          <option value="info">Info</option>
+          <option value="warn">Warning</option>
+          <option value="error">Error</option>
+        </select>
+      </div>
+      <div class="journal-scroll" id="log" tabindex="0" role="region" aria-labelledby="journal-title">
+        <table class="journal-table">
+          <thead><tr><th scope="col">Sim time</th><th scope="col">Level</th><th scope="col">Event</th></tr></thead>
+          <tbody id="journal-events"></tbody>
+        </table>
+      </div>
+      <small class="journal-status" id="journal-status"></small>
     </section>
-    <section class="card" aria-labelledby="lag-title">
-      <h2 id="lag-title">Consumer lag</h2>
-      <svg class="chart" id="chart" viewBox="0 0 600 120" preserveAspectRatio="none" role="img" aria-label="Committed consumer lag over time"></svg>
+    <section class="card monitoring-panel" aria-labelledby="lag-title">
+      <div class="monitoring-heading">
+        <h2 id="lag-title">Consumer lag</h2>
+        <div class="lag-selectors">
+          <select id="lag-group" aria-label="Consumer group"><option value="all">All groups</option></select>
+          <select id="lag-range" aria-label="Lag time range">
+            <option value="60">Last 1m</option>
+            <option value="300">Last 5m</option>
+            <option value="900">Last 15m</option>
+          </select>
+        </div>
+      </div>
+      <dl class="lag-stats">
+        <div><dt>Latest</dt><dd id="lag-latest">0</dd></div>
+        <div><dt>Average</dt><dd id="lag-average">0</dd></div>
+        <div><dt>Peak</dt><dd id="lag-peak">0</dd></div>
+      </dl>
+      <div id="lag-plot" class="lag-plot" tabindex="0" role="region" aria-label="Committed lag in records. Use the arrow keys to inspect samples.">
+        <svg id="chart" aria-hidden="true"></svg>
+        <svg id="lag-crosshair" aria-hidden="true"><line/><circle r="4"/></svg>
+        <output id="lag-tooltip" class="lag-tooltip" hidden></output>
+      </div>
+      <div class="lag-legend"><span>Committed lag · records</span><small>Simulation time</small></div>
     </section>
   </div>
   <p class="model-note">Kafka Lab uses a simplified simulation. Timing is illustrative.</p>
 </main>
+<script src="monitoring.js"></script>
 <script src="core.js"></script>
 <script src="lab.js"></script>
 </html>
