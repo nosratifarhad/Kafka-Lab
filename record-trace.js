@@ -6,6 +6,7 @@ const recordTrace = (() => {
   const location = document.getElementById('record-location');
   const timeline = document.getElementById('record-events');
   const route = document.getElementById('record-route');
+  const transactionButton = document.getElementById('record-transaction');
   const traces = new Map();
   const nextPartition = new Map();
   let sequence = 0;
@@ -82,14 +83,15 @@ const recordTrace = (() => {
     history.value = trace.id;
   }
 
-  function send(topic, key, value) {
+  function send(topic, key, value, transactional) {
+    if (transactional && !transactions.canWrite()) return;
     const partitions = P.filter(partition => partition.topic === topic);
     if (!partitions.length) return;
     const index = key === '' ? (nextPartition.get(topic) ?? 0) : hashKey(key) % partitions.length;
     const partition = partitions[index];
     if (key === '') nextPartition.set(topic, (index + 1) % partitions.length);
 
-    const acks = $('acks').value;
+    const acks = transactional ? 'all' : $('acks').value;
     const trace = {
       id: 'R' + ++sequence, partition, key, value, offset: null,
       status: 'Submitting', events: []
@@ -106,7 +108,9 @@ const recordTrace = (() => {
       trace.offset = appendRecord(partition, acks);
       partition.tracedRecords ??= new Map();
       partition.tracedRecords.set(trace.offset, trace);
-      addEvent(trace, 'Appended on B' + partition.leader + ' at offset ' + trace.offset, 'Broker');
+      const transactionId = transactional ? transactions.markWrite(partition, trace.offset, trace.offset + 1) : '';
+      addEvent(trace, 'Appended on B' + partition.leader + ' at offset ' + trace.offset +
+        (transactionId ? ' in ' + transactionId : ''), 'Broker');
       if (acks === 'all') {
         trace.status = 'Waiting for ACK';
       } else if (acks === '1') {
@@ -140,6 +144,15 @@ const recordTrace = (() => {
     }
   }
 
+  function transactionOutcome(partition, start, end, id, outcome) {
+    if (!partition.tracedRecords) return;
+    for (const [offset, trace] of partition.tracedRecords) {
+      if (start <= offset && offset < end) {
+        addEvent(trace, id + ' ' + outcome, 'Transaction', outcome === 'aborted' ? 'warn' : 'info');
+      }
+    }
+  }
+
   function prune(partition) {
     if (!partition.tracedRecords) return;
     for (const [offset, trace] of partition.tracedRecords) {
@@ -155,7 +168,7 @@ const recordTrace = (() => {
     event.preventDefault();
     const key = document.getElementById('record-key').value.slice(0, 128);
     const value = document.getElementById('record-value').value.slice(0, 512);
-    if (value) send(Number(topicSelect.value), key, value);
+    if (value) send(Number(topicSelect.value), key, value, event.submitter === transactionButton);
   });
   history.addEventListener('change', renderSelection);
   route.addEventListener('click', () => {
@@ -178,5 +191,5 @@ const recordTrace = (() => {
     $('journal-search').focus({preventScroll: true});
   });
 
-  return {reset, replicaAck, consume, prune};
+  return {reset, replicaAck, consume, transactionOutcome, prune};
 })();
