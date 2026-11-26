@@ -50,6 +50,15 @@ The lab publishes a commit or abort decision when all participating writes reach
 
 The lab uses round-robin assignment across the online members in each group.
 
+## Compare retention and compaction
+
+1. In **Kafka data → Trace a record**, send two different values with the same key and topic. Step to replicate them.
+2. In **Internal systems lab → Storage**, select **Run compaction**. **Partition logs** mark the older version's offset as a gap and show the latest value. The surviving offsets keep their original numbers.
+3. Select **Tombstone (null value)**, send the same key again, and step to replicate it. Run compaction to remove the previous value. Advance through **Tombstone grace** and run compaction again to remove the tombstone.
+4. Use **Run retention** to remove records from the start of each partition log. Compare the **Start** offset with the interior gaps left by compaction.
+
+Compaction works on keyed records sent from **Trace a record**. The simulation measures tombstone grace from append time and compacts records below the last stable offset. Consumer lag still measures the distance between offsets, while **Records retained** counts the surviving records.
+
 ## Where to look
 
 | Panel | What you can inspect or change |
@@ -89,3 +98,4 @@ Kafka Visual Lab uses a simplified, discrete model of Kafka behavior. Counters a
 | [`record-trace.js`](record-trace.js) | Single-record routing, lifecycle timeline, and trace controls |
 | [`transactions.js`](transactions.js) | Transaction lifecycle, last stable offsets, and consumer isolation |
 | [`consumer-groups.js`](consumer-groups.js) | Group membership, rebalance timing, and partition ownership |
+| [`log-storage.js`](log-storage.js) | Keyed record storage, compaction gaps, and retention |
