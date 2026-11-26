@@ -1,0 +1,388 @@
+:root {
+  color-scheme: dark;
+  --panel: #101c2d;
+  --border: #263950;
+  --muted: #a5b8ce;
+  --accent: #5eead4;
+}
+
+body {
+  background: radial-gradient(ellipse at 50% 0, #142337, #080e19 680px);
+}
+
+main {
+  display: block;
+  padding: 0 24px 24px;
+}
+
+.lab-header {
+  position: static;
+  max-width: 1800px;
+  margin-inline: auto;
+  padding: 11px 24px;
+  background: transparent;
+  border: 0;
+}
+
+.lab-header h1 {
+  margin: 0;
+  font-size: clamp(24px, 2.3vw, 32px);
+  letter-spacing: -.035em;
+}
+
+.lab-header output {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.simulation-bar {
+  position: sticky;
+  z-index: 5;
+  top: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 8px;
+  background: #0c1625;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.simulation-bar button,
+.topology-controls button,
+.topology-controls select {
+  padding: 7px 10px;
+}
+
+.simulation-bar #pause {
+  min-width: 64px;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+.log:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.stats {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stat {
+  padding: 10px 12px;
+  border: 1px solid #23374f;
+}
+
+.stat small {
+  color: var(--muted);
+}
+
+.stat strong {
+  margin-top: 4px;
+  font-size: clamp(17px, 1.6vw, 24px);
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat:last-child strong {
+  font-size: 16px;
+}
+
+main > .card,
+.dashboard-summary > .card {
+  background: var(--panel);
+  border-color: var(--border);
+  margin: 0;
+}
+
+main > .topology-card {
+  margin-top: 12px;
+}
+
+.topology-card .detail {
+  background: #142338;
+  border-color: var(--border);
+  overflow-wrap: anywhere;
+}
+
+.topology-card .legend {
+  margin: 9px 0;
+}
+
+.legend-consumer { color: #7dd3fc; }
+.legend-replica { color: #c4a5ff; }
+.legend-leader { color: #fbbf24; }
+
+#seekPanel {
+  margin-top: 8px;
+  scroll-margin-block-start: 110px;
+}
+
+.topology-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+#flow-settings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+#flow-settings .dialfield {
+  padding: 0;
+  border: 0;
+}
+
+#flow-settings .dial {
+  flex-basis: 33px;
+  width: 33px;
+  height: 33px;
+}
+
+#flow-settings .dial span {
+  inset: 4px;
+}
+
+.batch-controls label,
+.experiment-controls label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.batch-controls output {
+  color: var(--accent);
+  font: 600 15px monospace;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 33px;
+}
+
+.control-row input,
+.control-row select {
+  flex: 1;
+  min-width: 0;
+  accent-color: #2dd4bf;
+}
+
+.control-row input {
+  padding: 0;
+}
+
+.dashboard-summary {
+  display: grid;
+  grid-template-columns: minmax(200px, .75fr) repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+  margin-block: 12px;
+}
+
+.dashboard-summary h2,
+.dashboard-internals h2,
+.dashboard-data h2 {
+  font-size: 19px;
+}
+
+.dashboard-settings details {
+  border-top: 1px solid var(--border);
+}
+
+.dashboard-settings summary {
+  padding-block: 12px;
+  list-style-position: inside;
+  cursor: pointer;
+}
+
+.dashboard-settings summary::marker {
+  color: var(--accent);
+}
+
+.dashboard-settings .toolbar {
+  margin-top: 12px;
+}
+
+.dashboard-settings p {
+  margin: 10px 0;
+}
+
+.dashboard-summary .chart,
+.dashboard-summary .log {
+  height: 140px;
+}
+
+.dashboard-summary .log {
+  overflow-wrap: anywhere;
+}
+
+.dashboard-internals .internav {
+  margin-top: 12px;
+}
+
+.dashboard-internals .internalcontrols {
+  max-height: none;
+}
+
+main > .dashboard-data {
+  margin-top: 12px;
+}
+
+.data-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.data-heading h2 {
+  margin: 0;
+}
+
+.data-heading select {
+  margin-inline-start: 6px;
+}
+
+.dashboard-data #view {
+  overflow: auto;
+}
+
+.dashboard-data #view:has(> .partition) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 10px;
+}
+
+.dashboard-data .partition {
+  margin: 0;
+}
+
+.model-note {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (min-width: 1100px) {
+  .dashboard-internals .internalcontrols {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 14px;
+    align-content: start;
+  }
+}
+
+@media (max-width: 1120px) {
+  .stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .topology-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #flow-settings {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  main {
+    padding-inline: 12px;
+  }
+
+  .lab-header {
+    padding: 14px 12px;
+  }
+
+  .dashboard-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-settings {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 520px) {
+  main > .card,
+  .dashboard-summary > .card {
+    padding: 12px;
+  }
+
+  .simulation-bar button {
+    font-size: 13px;
+    padding: 6px 8px;
+  }
+
+  .stat {
+    padding: 7px;
+  }
+
+  .stat small {
+    display: block;
+    min-height: 2.4em;
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
+  .stat strong {
+    font-size: 14px;
+  }
+
+  .stat:last-child strong {
+    font-size: 10px;
+  }
+
+  .dashboard-summary,
+  .topology-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .topology-controls,
+  #flow-settings {
+    gap: 10px;
+  }
+
+  #flow-settings .dialtitle label {
+    font-size: 12px;
+  }
+
+  #flow-settings .dialrow {
+    gap: 4px;
+  }
+
+  #flow-settings .dial {
+    flex-basis: 27px;
+    width: 27px;
+    height: 27px;
+  }
+
+  #flow-settings .nudge {
+    padding-inline: 4px;
+  }
+
+  .topology-card .legend {
+    font-size: 12px;
+    gap: 8px 12px;
+  }
+}

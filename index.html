@@ -29,32 +29,115 @@ main>aside,main>article{min-width:0}
 .graph-legend i{display:inline-block;width:18px;height:2px;background:currentColor}
 @media(prefers-reduced-motion:reduce){.toposcroll .animated{animation:none}}
 </style>
-<header><div><h1>Kafka Lab <span class="tag">● INTERACTIVE</span></h1><small>Interactive distributed systems sandbox</small></div><span class="tag" id="clock">t = 0s</span></header><main>
-<div class="topology-overview">
-<div class="toolbar"><button class="primary" id="pause" onclick="running=!running;render()">Run</button><button onclick="step()">Step +1s</button><button onclick="reset()">Reset</button><button onclick="rebalance();render()">Rebalance</button><button onclick="retain();render()">Run retention</button><button onclick="seekOffsets()">Seek offsets</button><button onclick="recoverAll()">Recover all</button></div><section class="stats" id="stats"></section>
-<section class="card topology-card" aria-labelledby="topology-title">
-  <div class="topology-heading">
-    <div>
-      <h2 id="topology-title">Live topology</h2>
-      <small id="topology-help">Select a node to trace its connections. Select a broker header to stop or recover it.</small>
-    </div>
-    <div class="topology-tools" role="group" aria-label="Topology zoom and selection">
-      <button id="topology-zoom-out" class="smallbtn" type="button" aria-label="Zoom out">−</button>
-      <output id="topology-zoom-level" aria-label="Topology zoom">100%</output>
-      <button id="topology-zoom-in" class="smallbtn" type="button" aria-label="Zoom in">+</button>
-      <button id="topology-fit" class="smallbtn" type="button" aria-pressed="false">Fit</button>
-      <button id="topology-clear" class="smallbtn" type="button" disabled>Clear selection</button>
-    </div>
+<link rel="stylesheet" href="dashboard.css">
+<header class="lab-header">
+  <h1>Kafka Lab</h1>
+  <output id="clock" aria-label="Simulation time">t = 0s</output>
+</header>
+<main>
+  <div class="simulation-bar" role="group" aria-label="Simulation actions">
+    <button class="primary" id="pause" onclick="running=!running;render()">Run</button>
+    <button onclick="step()">Step +1s</button>
+    <button onclick="reset()">Reset</button>
+    <button onclick="rebalance();render()">Rebalance</button>
+    <button onclick="retain();render()">Run retention</button>
+    <button onclick="seekOffsets()">Seek offsets</button>
+    <button onclick="recoverAll()">Recover all</button>
   </div>
-  <div class="toposcroll" id="flow" tabindex="0" role="region" aria-label="Cluster diagram" aria-describedby="topology-help"></div>
-  <div class="legend graph-legend">
-    <span class="good"><i></i>Produce</span>
-    <span style="color:#7dd3fc"><i></i>Consumer data</span>
-    <span style="color:#c4a5ff"><i></i>Replica data</span>
-    <span style="color:#fbbf24">● Leader</span>
-    <span class="bad">● Offline</span>
+
+  <section class="stats" id="stats" aria-label="Cluster metrics"></section>
+
+  <section class="card topology-card" aria-labelledby="topology-title">
+    <div class="topology-heading">
+      <div>
+        <h2 id="topology-title">Live topology</h2>
+        <small id="topology-help">Select a node to trace its connections. Select a broker header to stop or recover it.</small>
+      </div>
+      <div class="topology-tools" role="group" aria-label="Topology zoom and selection">
+        <button id="topology-zoom-out" class="smallbtn" type="button" aria-label="Zoom out">−</button>
+        <output id="topology-zoom-level" aria-label="Topology zoom">100%</output>
+        <button id="topology-zoom-in" class="smallbtn" type="button" aria-label="Zoom in">+</button>
+        <button id="topology-fit" class="smallbtn" type="button" aria-pressed="false">Fit width</button>
+        <button id="topology-clear" class="smallbtn" type="button" disabled>Clear selection</button>
+      </div>
+    </div>
+    <div class="topology-controls" role="group" aria-label="Traffic and experiments">
+      <div id="flow-settings"></div>
+      <div class="batch-controls">
+        <label for="batch">Batch size <output id="batchValue" for="batch">10</output></label>
+        <div class="control-row">
+          <input id="batch" type="range" value="10" min="1" max="10000">
+          <button onclick="produce(+document.getElementById('batch').value);render()">Send batch</button>
+        </div>
+      </div>
+      <form id="experiment-form" class="experiment-controls">
+        <label for="scenarios">Experiment</label>
+        <div class="control-row">
+          <select id="scenarios" required><option value="">Choose a preset</option></select>
+          <button type="submit">Apply</button>
+        </div>
+      </form>
+    </div>
+    <div class="toposcroll" id="flow" tabindex="0" role="region" aria-label="Cluster diagram" aria-describedby="topology-help"></div>
+    <div class="legend graph-legend">
+      <span class="good"><i></i>Produce</span>
+      <span class="legend-consumer"><i></i>Consumer data</span>
+      <span class="legend-replica"><i></i>Replica data</span>
+      <span class="legend-leader">● Leader</span>
+      <span class="bad">● Offline</span>
+    </div>
+    <div class="detail" id="nodeDetail">Select a partition, producer, or consumer to inspect its state.</div>
+  </section>
+
+  <div class="dashboard-summary">
+    <section class="card dashboard-settings" aria-labelledby="settings-title">
+      <h2 id="settings-title">Settings</h2>
+      <details>
+        <summary>Cluster builder</summary>
+        <div id="config"></div>
+        <p><small>Changing a cluster control rebuilds the cluster.</small></p>
+        <button class="primary" onclick="apply()">Rebuild cluster</button>
+      </details>
+      <details>
+        <summary>Traffic settings</summary>
+        <div id="live"></div>
+        <div class="toolbar">
+          <button onclick="commit();render()">Commit</button>
+          <button onclick="restart();render()">Restart consumer</button>
+        </div>
+      </details>
+    </section>
+    <section class="card" aria-labelledby="lag-title">
+      <h2 id="lag-title">Consumer lag</h2>
+      <svg class="chart" id="chart" viewBox="0 0 600 120" preserveAspectRatio="none" role="img" aria-label="Committed consumer lag over time"></svg>
+    </section>
+    <section class="card" aria-labelledby="journal-title">
+      <h2 id="journal-title">Event journal</h2>
+      <div class="log" id="log" tabindex="0" role="region" aria-labelledby="journal-title"></div>
+    </section>
   </div>
-  <div class="detail" id="nodeDetail">Select a partition, producer, or consumer to inspect its state.</div>
-</section>
-</div>
-<aside><section class="card"><h3>Cluster builder</h3><div id="config"></div><button class="primary" onclick="apply()">Rebuild cluster</button><p><small>Release a cluster control to rebuild. Flow controls apply live.</small></p></section><section class="card"><h3>Traffic controls</h3><div id="live"></div><div class="toolbar"><button onclick="produce(+document.getElementById('batch').value);render()">Send batch</button><input id="batch" type="range" value="10" min="1" max="10000" style="width:130px"><output id="batchValue">10</output></div><div class="toolbar"><button onclick="commit();render()">Commit</button><button onclick="restart();render()">Restart consumer</button></div></section><section class="card"><h3>Experiments</h3><div id="scenarios"></div></section></aside><article><section class="card"><h2>Internal systems lab</h2><small>Click each stage or drag a knob. Counters react to the simulation.</small><div id="internav" class="internav"></div><div id="pipeline" class="pipeline paused"></div><div class="internals-grid"><div id="internalcontrols" class="internalcontrols"></div><div id="stageInfo" class="stage-info"></div></div><div id="internalactions" class="actionbar"></div></section><section class="card"><div class="tabs" id="tabs"></div><div id="view" style="margin-top:16px"></div></section><section class="card"><h3>Consumer lag — history</h3><svg class="chart" id="chart" viewBox="0 0 600 120" preserveAspectRatio="none"></svg></section><section class="card"><h3>Event journal</h3><div class="log" id="log"></div></section><section class="card hint"><h3>Simulation model</h3>This is a discrete educational model, not a Kafka process. Internals are simplified and timing is illustrative.</section></article></main><script src="core.js"></script><script src="lab.js"></script></html>
+
+  <section class="card dashboard-internals" aria-labelledby="internals-title">
+    <h2 id="internals-title">Internal systems lab</h2>
+    <small>Click each stage or drag a knob. Counters react to the simulation.</small>
+    <div id="internav" class="internav"></div>
+    <div id="pipeline" class="pipeline paused"></div>
+    <div class="internals-grid">
+      <div id="internalcontrols" class="internalcontrols"></div>
+      <div id="stageInfo" class="stage-info"></div>
+    </div>
+    <div id="internalactions" class="actionbar"></div>
+  </section>
+
+  <section class="card dashboard-data" aria-labelledby="data-title">
+    <div class="data-heading">
+      <h2 id="data-title">Kafka data</h2>
+      <label for="data-view">View <select id="data-view"></select></label>
+    </div>
+    <div id="view"></div>
+  </section>
+  <p class="model-note">Kafka Lab uses a simplified simulation. Timing is illustrative.</p>
+</main>
+<script src="core.js"></script>
+<script src="lab.js"></script>
+</html>
