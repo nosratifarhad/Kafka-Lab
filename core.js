@@ -20,31 +20,7 @@ function step(){t++;produce(read('producers')*read('rate'));for(let p of P){elec
 function lag(){return P.reduce((sum,p)=>{syncGroups(p);return sum+p.comm.slice(0,read('groups')).reduce((a,x)=>a+Math.max(0,p.leo-x),0)},0)}
 function render(){let n=lag();$('clock').textContent='t = '+t+' s';$('pause').textContent=running?'Pause':'Run';$('stats').innerHTML=[['Committed lag',n],['Records retained',P.reduce((a,p)=>a+p.leo-p.start,0)],['Brokers online',B.filter(b=>b.online).length+'/'+B.length],['Under replicated',P.filter(p=>p.isr.length<p.replicas.length).length],['Acknowledged',ackCount],['Rejected',rejected],['Pending ACK',P.reduce((a,p)=>a+p.pending.length,0)],['Group state',t<rebalanceUntil?'REBALANCING':'STABLE']].map(([a,b])=>'<div class="stat"><small>'+a+'</small><strong>'+b+'</strong></div>').join('');drawTopology();drawView();if(typeof renderInternal==='function'&&window.labReady)renderInternal();if(window.labReady)refreshDials();$('log').textContent=events.join('\n');$('log').style.whiteSpace='pre-wrap';let max=Math.max(1,...history);$('chart').innerHTML='<path d="M0 110 H600 M0 55 H600" stroke="#334155" fill="none"/><polyline fill="none" stroke="#2dd4bf" stroke-width="3" points="'+history.map((v,i)=>[i*600/Math.max(1,history.length-1),110-v/max*100].join(',')).join(' ')+'"/>'}
 function recoverAll(){B.forEach(b=>{if(!b.online)toggle(b.id)});log('Recovery started');render()}
-function seekOffsets() {
-  const topologyTab = $('workspace-topology-tab');
-  const openedFromAnotherTab = topologyTab.getAttribute('aria-selected') === 'false';
-  chooseWorkspace(topologyTab);
-
-  const existingPanel = $('seekPanel');
-  if (existingPanel) {
-    if (!openedFromAnotherTab) {
-      existingPanel.remove();
-      return;
-    }
-  } else {
-    const max = Math.max(0, ...P.map(partition => partition.hw));
-    $('nodeDetail').insertAdjacentHTML('afterend',
-      '<div class="detail" id="seekPanel"><label>Seek group 0 <input id="seekSlider" type="range" min="0" max="' +
-      max + '" value="0" oninput="document.getElementById(&quot;seekValue&quot;).textContent=this.value">' +
-      '<output id="seekValue">0</output></label><div class="toolbar">' +
-      '<button onclick="doSeek(&quot;earliest&quot;)">Earliest</button>' +
-      '<button onclick="doSeek(&quot;latest&quot;)">Latest</button>' +
-      '<button onclick="doSeek(document.getElementById(&quot;seekSlider&quot;).value)">Apply offset</button></div></div>');
-  }
-
-  $('seekPanel').scrollIntoView({block: 'nearest'});
-  $('seekSlider').focus({preventScroll: true});
-}
+function seekOffsets(){let id='seekPanel';if($(id)){ $(id).remove();return }let max=Math.max(0,...P.map(p=>p.hw));$('nodeDetail').insertAdjacentHTML('afterend','<div class="detail" id="seekPanel"><label>Seek group 0 <input id="seekSlider" type="range" min="0" max="'+max+'" value="0" oninput="document.getElementById(&quot;seekValue&quot;).textContent=this.value"><output id="seekValue">0</output></label><div class="toolbar"><button onclick="doSeek(&quot;earliest&quot;)">Earliest</button><button onclick="doSeek(&quot;latest&quot;)">Latest</button><button onclick="doSeek(document.getElementById(&quot;seekSlider&quot;).value)">Apply offset</button></div></div>');$('seekPanel').scrollIntoView({block:'nearest'})}
 function doSeek(v){for(let p of P)p.pos[0]=v==='earliest'?p.start:v==='latest'?p.hw:clamp(Number(v)||0,p.start,p.hw);log('Seek group 0: '+v);$('seekPanel')?.remove();render()}
 function selectNode(kind,i,j){selected={kind,i,j};drawTopology()}
 

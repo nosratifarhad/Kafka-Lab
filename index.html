@@ -1,7 +1,8 @@
 <!doctype html><html lang="en" dir="ltr"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Kafka Lab</title><style>
 *{box-sizing:border-box}body{margin:0;background:#0b1120;color:#e2e8f0;font:16px Tahoma,Arial,sans-serif}button,input,select{font:inherit}header{display:flex;justify-content:space-between;align-items:center;padding:22px 4%;border-bottom:1px solid #263349}h1,h2,h3,p{margin:0 0 12px}small{color:#94a3b8}button,select,input{border:1px solid #33445d;border-radius:8px;background:#172337;color:#e2e8f0;padding:9px}button{cursor:pointer}button:hover{border-color:#2dd4bf}button.primary{background:#0f766e;border-color:#2dd4bf}main{max-width:1500px;margin:auto;padding:24px;display:grid;grid-template-columns:300px 1fr;gap:18px}.card{background:#111c2e;border:1px solid #28364c;border-radius:14px;padding:18px;margin-bottom:15px}.field{display:flex;justify-content:space-between;align-items:center;margin:12px 0;gap:8px}.field input,.field select{width:115px;direction:ltr}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.stat{background:#142338;padding:16px;border-radius:10px}.stat strong{display:block;font-size:25px;color:#5eead4;margin-top:8px}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.flow{display:flex;align-items:center;justify-content:space-between;gap:10px;direction:ltr}.node{border:1px solid #3d5674;padding:15px;background:#18273d;border-radius:10px;text-align:center;min-width:110px}.wire{height:4px;flex:1;background:repeating-linear-gradient(90deg,#2dd4bf 0 10px,transparent 10px 25px);animation:move 1s linear infinite;min-width:24px}@keyframes move{to{background-position:50px}}.paused .wire{animation-play-state:paused}.brokers{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:9px;flex:5}.broker{border:1px solid #45607b;background:#17273b;padding:12px;border-radius:9px}.offline{opacity:.5;border-color:#f87171}.good{color:#5eead4}.bad{color:#fb7185}.rep{font-size:13px;padding:6px;margin:5px 0;border-radius:5px;background:#25344a}.leader{border-right:3px solid #fbbf24}.partition{margin:12px 0;padding:12px;background:#15243a;border-radius:9px}.blocks{display:flex;gap:4px;direction:ltr;flex-wrap:wrap;margin:9px 0}.block{padding:6px;background:#164e63;border:1px solid #2e7185;border-radius:4px;font:12px monospace}.consumed{background:#23443d;border-color:#397765}.pending{background:#713f12;border-color:#ca8a04}.log{font:13px monospace;direction:ltr;max-height:220px;overflow:auto;line-height:1.9}.hint{line-height:1.9;color:#cbd5e1}.tabs{display:flex;gap:8px;flex-wrap:wrap}.tab.active{background:#0f766e}.muted{color:#94a3b8}.chart{width:100%;height:120px}.tag{font-size:12px;color:#5eead4}table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:9px;border-bottom:1px solid #29384f;text-align:start}@media(max-width:900px){main{grid-template-columns:1fr;padding:12px}.flow{flex-wrap:wrap}.brokers{min-width:100%}.stats{grid-template-columns:repeat(2,1fr)}}
  .toposcroll{direction:ltr;overflow:auto;border:1px solid #263b54;border-radius:12px;background:radial-gradient(circle,#293a50 1px,transparent 1px);background-size:20px 20px;margin-top:12px}.toposcroll svg{display:block;min-width:900px;width:100%}.edge{fill:none;stroke-width:1.5;stroke:#405c7b}.animated{stroke:#2dd4bf;stroke-dasharray:6 9;animation:dash 1s linear infinite}.repedge{stroke:#a78bfa;stroke-dasharray:4 8;animation:dash 1.4s linear infinite}.paused .animated,.paused .repedge{animation-play-state:paused}@keyframes dash{to{stroke-dashoffset:-30}}.svgclick{cursor:pointer}.svgclick:hover rect{stroke:#fff}.detail{border:1px solid #344964;background:#19283d;padding:12px;border-radius:10px;line-height:1.8}.scrolltable{overflow:auto}.metricgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}.smallbtn{padding:5px 9px}.legend{display:flex;gap:15px;flex-wrap:wrap;font-size:14px;margin:12px 0}.hint h3{margin-top:18px}.hint p{margin-bottom:14px}body{font:15px system-ui,Arial,sans-serif;background:#080e19}header{padding:18px 24px;position:sticky;top:0;background:#0b1220ee;z-index:5;backdrop-filter:blur(12px)}main{grid-template-columns:310px minmax(0,1fr);padding:18px;max-width:1800px}.card{background:#101a29;border-color:#25344a}.dialfield{padding:11px 0;border-bottom:1px solid #22314a}.dialtitle,.dialrow{display:flex;align-items:center;gap:8px}.dialtitle{justify-content:space-between;margin-bottom:7px}.dialtitle output{font:600 15px monospace;color:#5eead4}.dialrow input[type=range]{width:100%;min-width:0;padding:0;accent-color:#2dd4bf;cursor:ew-resize;height:20px}.dial{flex:0 0 43px;width:43px;height:43px;border-radius:50%;background:conic-gradient(from 225deg,#2dd4bf 0deg,var(--arc,#2dd4bf) 1deg,#24374d 2deg,#24374d 270deg,transparent 270deg);position:relative;padding:4px;touch-action:none;border:1px solid #46617a}.dial:before{content:"";position:absolute;inset:5px;background:radial-gradient(circle at 35% 30%,#415775,#142033 65%);border:1px solid #536980;border-radius:50%}.dial span{position:absolute;inset:7px;transform:rotate(var(--angle));pointer-events:none}.dial span:after{content:"";position:absolute;top:2px;left:calc(50% - 1px);width:3px;height:9px;background:#5eead4;border-radius:2px}.nudge{padding:3px 7px;font-size:16px}.internav{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}.internav button.on{background:#164e63;border-color:#2dd4bf}.pipeline{display:flex;align-items:center;overflow:auto;min-height:130px;gap:7px;padding:15px;background:radial-gradient(circle,#26364b 1px,transparent 1px);background-size:16px 16px;border:1px solid #344964;border-radius:10px}.stage{flex:0 0 145px;background:#17273b;border:1px solid #405c7b;border-radius:10px;padding:12px;text-align:left;min-height:100px;cursor:pointer}.stage strong{display:block;font-size:17px;color:#5eead4;margin:8px 0}.stage.active{border-color:#5eead4}.pipewire{flex:0 0 35px;height:3px;background:repeating-linear-gradient(90deg,#2dd4bf 0 6px,transparent 6px 14px);animation:move .7s linear infinite}.paused .pipewire{animation-play-state:paused}.internals-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:14px}.internalcontrols{max-height:390px;overflow:auto;padding-right:8px}.stage-info{line-height:1.7;padding:14px;background:#15243a;border-radius:10px}.actionbar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.stat strong{font-size:22px}.log{white-space:pre-wrap}.field{direction:ltr}@media(max-width:900px){main{grid-template-columns:minmax(0,1fr)}.internals-grid{grid-template-columns:1fr}header{position:static}.stats{grid-template-columns:repeat(2,1fr)}}
-.topology-overview{min-width:0}
+main>aside,main>article{min-width:0}
+.topology-overview{grid-column:1/-1;min-width:0}
 .topology-card{margin:15px 0 0}
 .topology-heading,.topology-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .topology-heading{justify-content:space-between}
@@ -27,58 +28,10 @@
 .graph-legend span{display:inline-flex;align-items:center;gap:6px}
 .graph-legend i{display:inline-block;width:18px;height:2px;background:currentColor}
 @media(prefers-reduced-motion:reduce){.toposcroll .animated{animation:none}}
-
-header{position:static}
-main{display:block}
-.simulation-actions{margin-bottom:12px}
-.workspace-tabs{display:flex;gap:5px;position:sticky;top:0;z-index:4;padding:7px;background:#0b1220;border:1px solid #25344a;border-radius:11px;margin-bottom:14px}
-.workspace-tab{background:transparent;border-color:transparent;color:#a9bad0;padding:8px 12px}
-.workspace-tab[aria-selected=true]{color:#e2e8f0;background:#123341;border-color:#2c6971}
-.workspace-tab:focus-visible,.workspace-panel:focus-visible{outline:2px solid #5eead4;outline-offset:2px}
-.workspace-panel[hidden]{display:none}
-.workspace-grid{display:grid;gap:14px;align-items:start}
-.workspace-grid>.card{min-width:0;margin:0}
-.workspace-controls{grid-template-columns:minmax(0,1fr) minmax(0,1.35fr) minmax(0,.8fr)}
-.workspace-monitor{grid-template-columns:1fr 1fr}
-.workspace-controls .dialfield{padding-block:7px}
-.workspace-controls .dial{flex-basis:35px;width:35px;height:35px}
-.workspace-controls .dial span{inset:5px}
-.workspace-controls .toolbar{margin-top:12px}
-.workspace-controls p{margin:10px 0 0}
-.workspace-data #view{overflow:auto;margin-top:16px}
-.workspace-monitor .chart{height:185px}
-.workspace-monitor .log{min-height:185px}
-.workspace-monitor .hint{grid-column:1/-1}
-.workspace-monitor .hint h3{margin-top:0}
-#seekPanel{scroll-margin-top:65px}
-@media(min-width:1150px){
-  .workspace-controls{grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,.8fr)}
-  .workspace-controls #live{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:16px}
-  .topology-overview .stats{grid-template-columns:repeat(8,minmax(0,1fr))}
-  .topology-overview .stat{padding:12px}
-  .topology-overview .stat strong{font-size:clamp(15px,1.35vw,22px)}
-}
-@media(max-width:900px){
-  .workspace-controls{grid-template-columns:repeat(2,minmax(0,1fr))}
-}
-@media(max-width:640px){
-  .workspace-grid{grid-template-columns:minmax(0,1fr)}
-  .workspace-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;padding:4px}
-  .workspace-tab{font-size:12px;padding:8px 2px}
-  .simulation-actions button{font-size:13px;padding:7px}
-}
 </style>
 <header><div><h1>Kafka Lab <span class="tag">● INTERACTIVE</span></h1><small>Interactive distributed systems sandbox</small></div><span class="tag" id="clock">t = 0s</span></header><main>
-<div class="toolbar simulation-actions"><button class="primary" id="pause" onclick="running=!running;render()">Run</button><button onclick="step()">Step +1s</button><button onclick="reset()">Reset</button><button onclick="rebalance();render()">Rebalance</button><button onclick="retain();render()">Run retention</button><button onclick="seekOffsets()">Seek offsets</button><button onclick="recoverAll()">Recover all</button></div>
-<div class="workspace-tabs" role="tablist" aria-label="Kafka Lab workspace">
-  <button class="workspace-tab" id="workspace-topology-tab" role="tab" type="button" aria-controls="workspace-topology" aria-selected="true">Topology</button>
-  <button class="workspace-tab" id="workspace-controls-tab" role="tab" type="button" aria-controls="workspace-controls" aria-selected="false" tabindex="-1">Controls</button>
-  <button class="workspace-tab" id="workspace-internals-tab" role="tab" type="button" aria-controls="workspace-internals" aria-selected="false" tabindex="-1">Internals</button>
-  <button class="workspace-tab" id="workspace-data-tab" role="tab" type="button" aria-controls="workspace-data" aria-selected="false" tabindex="-1">Data</button>
-  <button class="workspace-tab" id="workspace-monitor-tab" role="tab" type="button" aria-controls="workspace-monitor" aria-selected="false" tabindex="-1">Monitor</button>
-</div>
-<div class="workspace-panel topology-overview" id="workspace-topology" role="tabpanel" aria-labelledby="workspace-topology-tab" tabindex="0">
-<section class="stats" id="stats"></section>
+<div class="topology-overview">
+<div class="toolbar"><button class="primary" id="pause" onclick="running=!running;render()">Run</button><button onclick="step()">Step +1s</button><button onclick="reset()">Reset</button><button onclick="rebalance();render()">Rebalance</button><button onclick="retain();render()">Run retention</button><button onclick="seekOffsets()">Seek offsets</button><button onclick="recoverAll()">Recover all</button></div><section class="stats" id="stats"></section>
 <section class="card topology-card" aria-labelledby="topology-title">
   <div class="topology-heading">
     <div>
@@ -104,21 +57,4 @@ main{display:block}
   <div class="detail" id="nodeDetail">Select a partition, producer, or consumer to inspect its state.</div>
 </section>
 </div>
-<div class="workspace-panel workspace-grid workspace-controls" id="workspace-controls" role="tabpanel" aria-labelledby="workspace-controls-tab" tabindex="0" hidden>
-<section class="card"><h3>Cluster builder</h3><div id="config"></div><button class="primary" onclick="apply()">Rebuild cluster</button><p><small>Release a cluster control to rebuild. Flow controls apply live.</small></p></section>
-<section class="card"><h3>Traffic controls</h3><div id="live"></div><div class="toolbar"><button onclick="produce(+document.getElementById('batch').value);render()">Send batch</button><input id="batch" type="range" value="10" min="1" max="10000" style="width:130px"><output id="batchValue">10</output></div><div class="toolbar"><button onclick="commit();render()">Commit</button><button onclick="restart();render()">Restart consumer</button></div></section>
-<section class="card"><h3>Experiments</h3><div id="scenarios"></div></section>
-</div>
-<div class="workspace-panel" id="workspace-internals" role="tabpanel" aria-labelledby="workspace-internals-tab" tabindex="0" hidden>
-<section class="card"><h2>Internal systems lab</h2><small>Click each stage or drag a knob. Counters react to the simulation.</small><div id="internav" class="internav"></div><div id="pipeline" class="pipeline paused"></div><div class="internals-grid"><div id="internalcontrols" class="internalcontrols"></div><div id="stageInfo" class="stage-info"></div></div><div id="internalactions" class="actionbar"></div></section>
-</div>
-<div class="workspace-panel workspace-data" id="workspace-data" role="tabpanel" aria-labelledby="workspace-data-tab" tabindex="0" hidden>
-<section class="card"><div class="tabs" id="tabs"></div><div id="view"></div></section>
-</div>
-<div class="workspace-panel workspace-grid workspace-monitor" id="workspace-monitor" role="tabpanel" aria-labelledby="workspace-monitor-tab" tabindex="0" hidden>
-<section class="card"><h3>Consumer lag — history</h3><svg class="chart" id="chart" viewBox="0 0 600 120" preserveAspectRatio="none"></svg></section>
-<section class="card"><h3>Event journal</h3><div class="log" id="log"></div></section>
-<section class="card hint"><h3>Simulation model</h3>This is a discrete educational model, not a Kafka process. Internals are simplified and timing is illustrative.</section>
-</div>
-</main>
-<script src="core.js"></script><script src="lab.js"></script></html>
+<aside><section class="card"><h3>Cluster builder</h3><div id="config"></div><button class="primary" onclick="apply()">Rebuild cluster</button><p><small>Release a cluster control to rebuild. Flow controls apply live.</small></p></section><section class="card"><h3>Traffic controls</h3><div id="live"></div><div class="toolbar"><button onclick="produce(+document.getElementById('batch').value);render()">Send batch</button><input id="batch" type="range" value="10" min="1" max="10000" style="width:130px"><output id="batchValue">10</output></div><div class="toolbar"><button onclick="commit();render()">Commit</button><button onclick="restart();render()">Restart consumer</button></div></section><section class="card"><h3>Experiments</h3><div id="scenarios"></div></section></aside><article><section class="card"><h2>Internal systems lab</h2><small>Click each stage or drag a knob. Counters react to the simulation.</small><div id="internav" class="internav"></div><div id="pipeline" class="pipeline paused"></div><div class="internals-grid"><div id="internalcontrols" class="internalcontrols"></div><div id="stageInfo" class="stage-info"></div></div><div id="internalactions" class="actionbar"></div></section><section class="card"><div class="tabs" id="tabs"></div><div id="view" style="margin-top:16px"></div></section><section class="card"><h3>Consumer lag — history</h3><svg class="chart" id="chart" viewBox="0 0 600 120" preserveAspectRatio="none"></svg></section><section class="card"><h3>Event journal</h3><div class="log" id="log"></div></section><section class="card hint"><h3>Simulation model</h3>This is a discrete educational model, not a Kafka process. Internals are simplified and timing is illustrative.</section></article></main><script src="core.js"></script><script src="lab.js"></script></html>
