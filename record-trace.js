@@ -7,6 +7,9 @@ const recordTrace = (() => {
   const timeline = document.getElementById('record-events');
   const route = document.getElementById('record-route');
   const transactionButton = document.getElementById('record-transaction');
+  const keyInput = document.getElementById('record-key');
+  const valueInput = document.getElementById('record-value');
+  const tombstone = document.getElementById('record-tombstone');
   const traces = new Map();
   const nextPartition = new Map();
   let sequence = 0;
@@ -41,7 +44,7 @@ const recordTrace = (() => {
     const status = placement + ' · ' + trace.status;
     if (location.textContent !== status) location.textContent = status;
     document.getElementById('record-sent-key').textContent = trace.key || '—';
-    document.getElementById('record-sent-value').textContent = trace.value;
+    document.getElementById('record-sent-value').textContent = trace.value === null ? 'Tombstone (null)' : trace.value;
     route.disabled = trace.offset === null;
 
     const entries = trace.events.map(({time, message}) => {
@@ -106,11 +109,12 @@ const recordTrace = (() => {
       addEvent(trace, 'Write rejected: ' + reason, 'Producer', 'error');
     } else {
       trace.offset = appendRecord(partition, acks);
+      logStorage.remember(partition, trace.offset, key, value);
       partition.tracedRecords ??= new Map();
       partition.tracedRecords.set(trace.offset, trace);
       const transactionId = transactional ? transactions.markWrite(partition, trace.offset, trace.offset + 1) : '';
       addEvent(trace, 'Appended on B' + partition.leader + ' at offset ' + trace.offset +
-        (transactionId ? ' in ' + transactionId : ''), 'Broker');
+        (transactionId ? ' in ' + transactionId : '') + (value === null ? ' · tombstone' : ''), 'Broker');
       if (acks === 'all') {
         trace.status = 'Waiting for ACK';
       } else if (acks === '1') {
@@ -164,11 +168,26 @@ const recordTrace = (() => {
     }
   }
 
+  function compacted(partition, offset, reason) {
+    const trace = partition.tracedRecords?.get(offset);
+    if (!trace) return;
+    partition.tracedRecords.delete(offset);
+    trace.status = 'Removed by compaction';
+    addEvent(trace, trace.status + ': ' + reason, 'Storage');
+  }
+
+  tombstone.addEventListener('change', () => {
+    keyInput.required = tombstone.checked;
+    keyInput.placeholder = tombstone.checked ? 'Required' : 'Optional';
+    valueInput.disabled = tombstone.checked;
+  });
   form.addEventListener('submit', event => {
     event.preventDefault();
-    const key = document.getElementById('record-key').value.slice(0, 128);
-    const value = document.getElementById('record-value').value.slice(0, 512);
-    if (value) send(Number(topicSelect.value), key, value, event.submitter === transactionButton);
+    const key = keyInput.value.slice(0, 128);
+    const value = tombstone.checked ? null : valueInput.value.slice(0, 512);
+    if (value === null ? key !== '' : value !== '') {
+      send(Number(topicSelect.value), key, value, event.submitter === transactionButton);
+    }
   });
   history.addEventListener('change', renderSelection);
   route.addEventListener('click', () => {
@@ -191,5 +210,5 @@ const recordTrace = (() => {
     $('journal-search').focus({preventScroll: true});
   });
 
-  return {reset, replicaAck, consume, transactionOutcome, prune};
+  return {reset, replicaAck, consume, transactionOutcome, compacted, prune};
 })();

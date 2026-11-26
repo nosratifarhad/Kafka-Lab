@@ -124,7 +124,10 @@ main>aside,main>article{min-width:0}
       <form id="record-form" class="record-form">
         <label>Topic <select id="record-topic"></select></label>
         <label>Key <input id="record-key" placeholder="Optional" maxlength="128"></label>
-        <label>Value <input id="record-value" maxlength="512" required></label>
+        <div class="record-value-field">
+          <label>Value <input id="record-value" maxlength="512" required></label>
+          <label class="record-tombstone"><input id="record-tombstone" type="checkbox"> Tombstone (null value)</label>
+        </div>
         <div class="record-actions">
           <button class="primary" type="submit">Send record</button>
           <button type="submit" id="record-transaction" hidden>Add to transaction</button>
@@ -231,6 +234,7 @@ main>aside,main>article{min-width:0}
 </main>
 <script src="monitoring.js"></script>
 <script src="consumer-groups.js"></script>
+<script src="log-storage.js"></script>
 <script src="transactions.js"></script>
 <script src="record-trace.js"></script>
 <script src="core.js"></script>

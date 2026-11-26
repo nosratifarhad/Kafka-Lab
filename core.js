@@ -21,7 +21,7 @@ function toggleConsumer(group, consumer) {
   consumerMembership.toggle(group, consumer);
   render();
 }
-function elect(p){if(p.leader!==null&&B[p.leader].online)return;let n=p.isr.find(x=>B[x].online);if(n===undefined){p.leader=null;return}p.leader=n;p.leo=p.offsets[n];p.hw=Math.min(p.hw,p.leo);p.pending=p.pending.filter(x=>x<=p.leo);for(let b of p.replicas)p.offsets[b]=Math.min(p.offsets[b],p.leo);recordTrace.prune(p);transactions.prune(p);log('Leader elected B'+n+' for T'+p.topic+'/P'+p.id, 'Controller')}
+function elect(p){if(p.leader!==null&&B[p.leader].online)return;let n=p.isr.find(x=>B[x].online);if(n===undefined){p.leader=null;return}p.leader=n;p.leo=p.offsets[n];p.hw=Math.min(p.hw,p.leo);p.pending=p.pending.filter(x=>x<=p.leo);for(let b of p.replicas)p.offsets[b]=Math.min(p.offsets[b],p.leo);recordTrace.prune(p);transactions.prune(p);logStorage.prune(p);log('Leader elected B'+n+' for T'+p.topic+'/P'+p.id, 'Controller')}
 function toggle(i){B[i].online=!B[i].online;log('Broker '+i+(B[i].online?' recovered':' stopped'), 'Broker', B[i].online?'info':'warn');P.forEach(p=>{if(!B[i].online){elect(p);p.isr=p.isr.filter(x=>x!==i)}else{if(p.offsets[i]>=p.hw&&p.replicas.includes(i)&&!p.isr.includes(i))p.isr.push(i);elect(p)} });render()}
 function hashKey(key) {
   let hash = 0;
@@ -79,12 +79,16 @@ function commit() {
 function restart(){P.forEach(p=>p.pos=[...p.comm]);rebalance();log('Consumer positions restored from committed offsets', 'Consumer group')}
 function retain() {
   const retention = read('retention');
+  let expired = 0;
   for (const partition of P) {
-    partition.start = Math.max(partition.start, Math.min(partition.hw - retention, transactions.lastStableOffset(partition)));
+    const start = logStorage.retentionStart(partition, retention);
+    expired += logStorage.recordCount(partition, partition.start, start);
+    partition.start = start;
     recordTrace.prune(partition);
     transactions.prune(partition);
+    logStorage.prune(partition);
   }
-  log('Retention advanced log start offsets (record-count abstraction)', 'Storage');
+  log('Retention removed ' + expired + ' records from the start of partition logs', 'Storage');
 }
 
 function replicatePartition(partition, fetchRate, lagTimeout, minIsr) {
@@ -170,7 +174,7 @@ function lagByGroup() {
 function lag() {
   return lagByGroup().reduce((total, group) => total + group, 0);
 }
-function render(){consumerMembership.sync();let n=monitoring.addSample(t,lagByGroup());$('clock').textContent='t = '+t+' s';$('pause').textContent=running?'Pause':'Run';$('stats').innerHTML=[['Committed lag',n],['Records retained',P.reduce((a,p)=>a+p.leo-p.start,0)],['Brokers online',B.filter(b=>b.online).length+'/'+B.length],['Under replicated',P.filter(p=>p.isr.length<p.replicas.length).length],['Acknowledged',ackCount],['Rejected',rejected],['Pending ACK',P.reduce((a,p)=>a+p.pending.length,0)],['Group state',consumerMembership.summary()]].map(([a,b])=>'<div class="stat"><small>'+a+'</small><strong>'+b+'</strong></div>').join('');drawTopology();drawView();transactions.updateControls();if(typeof renderInternal==='function'&&window.labReady)renderInternal();if(window.labReady)refreshDials()}
+function render(){consumerMembership.sync();let n=monitoring.addSample(t,lagByGroup());$('clock').textContent='t = '+t+' s';$('pause').textContent=running?'Pause':'Run';$('stats').innerHTML=[['Committed lag',n],['Records retained',P.reduce((total, partition) => total + logStorage.recordCount(partition), 0)],['Brokers online',B.filter(b=>b.online).length+'/'+B.length],['Under replicated',P.filter(p=>p.isr.length<p.replicas.length).length],['Acknowledged',ackCount],['Rejected',rejected],['Pending ACK',P.reduce((a,p)=>a+p.pending.length,0)],['Group state',consumerMembership.summary()]].map(([a,b])=>'<div class="stat"><small>'+a+'</small><strong>'+b+'</strong></div>').join('');drawTopology();drawView();transactions.updateControls();if(typeof renderInternal==='function'&&window.labReady)renderInternal();if(window.labReady)refreshDials()}
 function recoverAll(){B.forEach(b=>{if(!b.online)toggle(b.id)});log('Recovery started', 'Broker');render()}
 function seekOffsets(){let id='seekPanel';if($(id)){ $(id).remove();return }let max=Math.max(0,...P.map(p=>p.hw));$('nodeDetail').insertAdjacentHTML('afterend','<div class="detail" id="seekPanel"><label>Seek group 0 <input id="seekSlider" type="range" min="0" max="'+max+'" value="0" oninput="document.getElementById(&quot;seekValue&quot;).textContent=this.value"><output id="seekValue">0</output></label><div class="toolbar"><button onclick="doSeek(&quot;earliest&quot;)">Earliest</button><button onclick="doSeek(&quot;latest&quot;)">Latest</button><button onclick="doSeek(document.getElementById(&quot;seekSlider&quot;).value)">Apply offset</button></div></div>');$('seekPanel').scrollIntoView({block:'nearest'})}
 function doSeek(v){for(let p of P)p.pos[0]=v==='earliest'?p.start:v==='latest'?transactions.readLimit(p):clamp(Number(v)||0,p.start,p.hw);log('Seek group 0: '+v, 'Consumer group');$('seekPanel')?.remove();render()}
@@ -546,14 +550,28 @@ function transactionMetric(partition, prefix, suffix = '') {
   return partition.transactionRanges?.length ? prefix + transactions.lastStableOffset(partition) + suffix : '';
 }
 
+function escapeLogText(value) {
+  const entities = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'};
+  return value.replace(/[&<>"']/g, character => entities[character]);
+}
+
 function partitionLogBlock(partition, offset) {
+  if (logStorage.isGap(partition, offset)) {
+    return '<span class="block compacted-gap" title="Removed by log compaction">' + offset + ' · gap</span>';
+  }
   const trace = partition.tracedRecords?.get(offset);
+  const record = logStorage.recordAt(partition, offset);
   const visibility = offset >= partition.hw ? 'pending' : offset < partition.comm[0] ? 'consumed' : '';
-  const transaction = partition.transactionRanges?.find(range => range.start <= offset && offset < range.end)?.marker;
-  const label = transaction ? ' · ' + transaction.id + ' ' + transaction.state : '';
+  const transaction = transactions.markerAt(partition, offset);
+  const transactionLabel = transaction ? ' · ' + transaction.id + ' ' + transaction.state : '';
+  const summary = record ? record.key + '=' + (record.value === null ? 'tombstone' : record.value) : '';
+  const preview = summary.length > 24 ? summary.slice(0, 24) + '…' : summary;
   return '<span class="block ' + visibility + (trace ? ' tracked-record' : '') +
-    (transaction ? ' transaction-' + transaction.state : '') + '">' + offset +
-    (trace ? ' · ' + trace.id : '') + label + '</span>';
+    (record?.value === null ? ' tombstone-record' : '') +
+    (transaction ? ' transaction-' + transaction.state : '') + '"' +
+    (record ? ' title="' + escapeLogText(summary) + '"' : '') + '>' + offset +
+    (trace ? ' · ' + trace.id : '') + transactionLabel +
+    (record ? ' · ' + escapeLogText(preview) : '') + '</span>';
 }
 function consumerGroupTable() {
   return consumerMembership.groups.map(group => {

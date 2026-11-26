@@ -639,6 +639,23 @@ main > .dashboard-internals {
   min-width: 0;
 }
 
+.record-tombstone {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.record-form .record-tombstone {
+  display: flex;
+  align-items: center;
+}
+
+.record-form .record-tombstone input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
 .record-hint {
   margin: 8px 0 0;
   color: var(--muted);
@@ -710,6 +727,16 @@ main > .dashboard-internals {
 
 .tracked-record {
   outline: 1px solid var(--accent);
+}
+
+.compacted-gap {
+  border-style: dashed;
+  background: transparent;
+  color: var(--muted);
+}
+
+.tombstone-record {
+  border-color: #c4a5ff;
 }
 
 .transaction-controls {
