@@ -75,13 +75,14 @@ main>aside,main>article{min-width:0}
     <div class="topology-heading">
       <div>
         <h2 id="topology-title">Live topology</h2>
-        <small id="topology-help">Select a node to trace its connections. Select a broker header to stop or recover it.</small>
+        <small id="topology-help">Drag producers, broker headers, or consumers to arrange the graph. Drag empty space to pan. Click a broker header to stop or recover it.</small>
       </div>
-      <div class="topology-tools" role="group" aria-label="Topology zoom and selection">
+      <div class="topology-tools" role="group" aria-label="Topology zoom and layout">
         <button id="topology-zoom-out" class="smallbtn" type="button" aria-label="Zoom out">−</button>
         <output id="topology-zoom-level" aria-label="Topology zoom">100%</output>
         <button id="topology-zoom-in" class="smallbtn" type="button" aria-label="Zoom in">+</button>
         <button id="topology-fit" class="smallbtn" type="button" aria-pressed="false">Fit width</button>
+        <button id="topology-reset-layout" class="smallbtn" type="button">Reset layout</button>
         <button id="topology-clear" class="smallbtn" type="button" disabled>Clear selection</button>
       </div>
     </div>

@@ -117,6 +117,25 @@ main > .topology-card {
   margin: 9px 0;
 }
 
+.topology-card .toposcroll {
+  cursor: grab;
+  touch-action: pan-y;
+}
+
+.topology-card .toposcroll svg {
+  user-select: none;
+}
+
+.topology-card [data-topology-drag] {
+  cursor: grab;
+  touch-action: none;
+}
+
+.topology-card .toposcroll.dragging,
+.topology-card .toposcroll.dragging * {
+  cursor: grabbing;
+}
+
 .legend-consumer { color: #7dd3fc; }
 .legend-replica { color: #c4a5ff; }
 .legend-leader { color: #fbbf24; }
