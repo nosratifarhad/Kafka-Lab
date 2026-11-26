@@ -119,6 +119,31 @@ main>aside,main>article{min-width:0}
       <h2 id="data-title">Kafka data</h2>
       <label for="data-view">View <select id="data-view"></select></label>
     </div>
+    <details class="record-trace">
+      <summary>Trace a record</summary>
+      <form id="record-form" class="record-form">
+        <label>Topic <select id="record-topic"></select></label>
+        <label>Key <input id="record-key" placeholder="Optional" maxlength="128"></label>
+        <label>Value <input id="record-value" maxlength="512" required></label>
+        <button class="primary" type="submit">Send record</button>
+      </form>
+      <p class="record-hint">This write uses the current ACK setting. A key picks a partition within the topic. An empty key rotates between partitions. Use Step +1s or Run to advance replication and consumption.</p>
+      <div id="record-result" hidden>
+        <div class="record-toolbar">
+          <label>Record <select id="record-history"></select></label>
+          <button type="button" id="record-route">Show in topology</button>
+          <button type="button" id="record-journal">Filter event journal</button>
+        </div>
+        <div class="record-metadata">
+          <div id="record-location" role="status"></div>
+          <dl>
+            <div><dt>Key</dt><dd id="record-sent-key"></dd></div>
+            <div><dt>Value</dt><dd id="record-sent-value"></dd></div>
+          </dl>
+        </div>
+        <ol id="record-events" class="record-events" aria-label="Record timeline"></ol>
+      </div>
+    </details>
     <div id="view"></div>
   </section>
 
@@ -185,6 +210,7 @@ main>aside,main>article{min-width:0}
   <p class="model-note">Kafka Lab uses a simplified simulation. Timing is illustrative.</p>
 </main>
 <script src="monitoring.js"></script>
+<script src="record-trace.js"></script>
 <script src="core.js"></script>
 <script src="lab.js"></script>
 </html>

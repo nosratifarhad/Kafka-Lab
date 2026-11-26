@@ -27,6 +27,13 @@ python3 -m http.server 8080
 | Follow a leader election | Start with the default cluster. Apply **Leader failure** and open **Kafka data → Replication / ISR**. | A broker goes offline. Partitions it led elect an available in-sync replica when controller quorum is present. Search **Event journal** for `Leader elected`. |
 | Put pressure on acknowledgments | With the default cluster configuration, select **Recover all** and set **Produce / producer / sec** to 30. Apply **ACK blocked by ISR** and advance the simulation. | With `acks=all`, a write can be rejected when the in-sync replica count falls below `min.insync.replicas`. Compare **Rejected**, the journal, and the replica state. |
 
+## Follow a record
+
+1. Open **Kafka data → Trace a record**, choose a topic, and enter a value with an optional key.
+2. Select **Send record** to submit one write directly to the simulated leader with the current `acks` setting. A repeated key stays on the same partition within its topic. An empty key uses round robin within that topic.
+3. Use **Step +1s** or **Run** to see when replication acknowledges the write and which consumer in each group reads it. The partition log marks the record's offset with its trace ID.
+4. Use **Show in topology** to highlight the partition's connections, or **Filter event journal** to see only that record's events.
+
 ## Where to look
 
 | Panel | What you can inspect or change |
@@ -63,3 +70,4 @@ Kafka Visual Lab uses a simplified, discrete model of Kafka behavior. Counters a
 | [`core.js`](core.js) | Simulation clock, cluster state, records, replication, offsets, and topology |
 | [`lab.js`](lab.js) | Internal pipelines, transaction experiments, and interactive controls |
 | [`monitoring.js`](monitoring.js) | Lag sampling, chart interaction, and event journal |
+| [`record-trace.js`](record-trace.js) | Single-record routing, lifecycle timeline, and trace controls |

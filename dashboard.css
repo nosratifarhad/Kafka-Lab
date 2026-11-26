@@ -595,6 +595,113 @@ main > .dashboard-internals {
   margin: 0;
 }
 
+.record-trace {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #142338;
+}
+
+.record-trace summary {
+  cursor: pointer;
+}
+
+.record-trace summary::marker,
+#record-location {
+  color: var(--accent);
+}
+
+.record-form {
+  display: grid;
+  grid-template-columns: minmax(0, .7fr) minmax(0, 1fr) minmax(0, 2fr) auto;
+  align-items: end;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.record-form label {
+  display: grid;
+  gap: 4px;
+}
+
+.record-form input,
+.record-form select {
+  width: 100%;
+  min-width: 0;
+}
+
+.record-hint {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+#record-result {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.record-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.record-toolbar button:disabled {
+  opacity: .5;
+  cursor: default;
+}
+
+.record-metadata {
+  margin-top: 10px;
+}
+
+.record-metadata dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.record-metadata dt,
+.record-time {
+  color: var(--muted);
+}
+
+.record-metadata dd {
+  margin: 3px 0 0;
+  font-family: monospace;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.record-events {
+  max-height: 210px;
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.record-events li {
+  display: flex;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+
+.record-time {
+  min-width: 6ch;
+  font-family: monospace;
+}
+
+.tracked-record {
+  outline: 1px solid var(--accent);
+}
+
 .model-note {
   margin: 12px 0 0;
   color: var(--muted);
@@ -635,6 +742,10 @@ main > .dashboard-internals {
 
   .dashboard-monitoring {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .record-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
