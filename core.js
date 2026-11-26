@@ -23,14 +23,212 @@ function recoverAll(){B.forEach(b=>{if(!b.online)toggle(b.id)});log('Recovery st
 function seekOffsets(){let id='seekPanel';if($(id)){ $(id).remove();return }let max=Math.max(0,...P.map(p=>p.hw));$('nodeDetail').insertAdjacentHTML('afterend','<div class="detail" id="seekPanel"><label>Seek group 0 <input id="seekSlider" type="range" min="0" max="'+max+'" value="0" oninput="document.getElementById(&quot;seekValue&quot;).textContent=this.value"><output id="seekValue">0</output></label><div class="toolbar"><button onclick="doSeek(&quot;earliest&quot;)">Earliest</button><button onclick="doSeek(&quot;latest&quot;)">Latest</button><button onclick="doSeek(document.getElementById(&quot;seekSlider&quot;).value)">Apply offset</button></div></div>');$('seekPanel').scrollIntoView({block:'nearest'})}
 function doSeek(v){for(let p of P)p.pos[0]=v==='earliest'?p.start:v==='latest'?p.hw:clamp(Number(v)||0,p.start,p.hw);log('Seek group 0: '+v);$('seekPanel')?.remove();render()}
 function selectNode(kind,i,j){selected={kind,i,j};drawTopology()}
-function drawTopology(){let c=read('consumers'),g=read('groups'),pr=read('producers'),cols=Math.min(3,B.length),w=1100,brokerW=235,brokerX=218,rows=Math.ceil(B.length/cols),bh=100+Math.max(...B.map(b=>P.filter(p=>p.replicas.includes(b.id)).length))*24, H=Math.max(rows*(bh+38)+110, pr*46+100,c*g*46+100,420);let nodes=[],lines=[],locations={};const box=(x,y,width,height,title,sub,color,click='')=>'<g class="svgclick" '+click+'><rect x="'+x+'" y="'+y+'" width="'+width+'" height="'+height+'" rx="8" fill="#15243a" stroke="'+color+'"/><text x="'+(x+10)+'" y="'+(y+19)+'" fill="#e2e8f0" font-size="13" font-weight="bold">'+title+'</text><text x="'+(x+10)+'" y="'+(y+35)+'" fill="'+color+'" font-size="12">'+sub+'</text></g>';const line=(x,y,X,Y,cls)=>'<path class="edge '+cls+'" d="M'+x+' '+y+' C'+((x+X)/2)+' '+y+' '+((x+X)/2)+' '+Y+' '+X+' '+Y+'"/>';
-nodes.push('<text x="20" y="25" fill="#94a3b8">PRODUCERS</text><text x="220" y="25" fill="#94a3b8">KAFKA BROKERS / PARTITION REPLICAS</text><text x="955" y="25" fill="#94a3b8">CONSUMERS</text>');
-B.forEach((b,i)=>{let x=brokerX+(i%cols)*(brokerW+10),y=45+Math.floor(i/cols)*(bh+38);let pp=P.filter(p=>p.replicas.includes(i));nodes.push('<rect x="'+x+'" y="'+y+'" width="'+brokerW+'" height="'+(bh+10)+'" rx="10" fill="#0c1728" stroke="'+(b.online?'#405c7b':'#fb7185')+'"/>'+box(x+6,y+6,brokerW-12,43,'Broker '+i,b.online?'ONLINE · click to stop':'OFFLINE · click to recover',b.online?'#5eead4':'#fb7185','onclick="toggle('+i+')"'));pp.forEach((p,k)=>{let yy=y+57+k*24,leader=p.leader===i;locations[p.topic+':'+p.id+':'+i]=[x+brokerW-8,yy+10,x+8];nodes.push('<g class="svgclick" onclick="selectNode(&quot;partition&quot;,'+P.indexOf(p)+','+i+')"><rect x="'+(x+8)+'" y="'+yy+'" width="'+(brokerW-16)+'" height="21" rx="4" fill="'+(leader?'#473a19':'#20324a')+'" stroke="'+(leader?'#fbbf24':'#405c7b')+'"/><text x="'+(x+15)+'" y="'+(yy+15)+'" font-size="12" fill="#e2e8f0">T'+p.topic+' / P'+p.id+' · '+(leader?'LEADER':'FOLLOWER')+' · '+p.offsets[i]+' '+(p.isr.includes(i)?'✓':'')+'</text></g>')})});
-for(let i=0;i<pr;i++){let y=45+i*46;nodes.push(box(20,y,135,41,'Producer '+i,read('rate')+' msg/s','#5eead4','onclick="selectNode(&quot;producer&quot;,'+i+',0)"'));for(let p of P){if(p.leader===null)continue;let z=locations[p.topic+':'+p.id+':'+p.leader];if(z&&(pr<=5||P.indexOf(p)%Math.max(1,pr)===i))lines.push(line(155,y+20,z[2],z[1],read('rate')?'animated':''))}}
-P.forEach((p,ix)=>{if(p.leader===null)return;let z=locations[p.topic+':'+p.id+':'+p.leader];if(!z)return;for(let b of p.replicas){if(b===p.leader||!B[b].online)continue;let a=locations[p.topic+':'+p.id+':'+b];if(a)lines.push(line(z[0],z[1],a[2],a[1],'repedge'))}for(let j=0;j<g;j++){if(!c)continue;let n=j*c+ix%c;lines.push(line(z[0],z[1],955,65+n*46,t>=rebalanceUntil&&read('consume')?'animated':''))}});
-for(let j=0;j<g;j++)for(let i=0;i<c;i++){let n=j*c+i;nodes.push(box(955,45+n*46,135,41,'G'+j+' / C'+i,t<rebalanceUntil?'REBALANCING':P.filter((p,k)=>k%c===i).length+' partitions','#7dd3fc','onclick="selectNode(&quot;consumer&quot;,'+i+','+j+')"'))}
-$('flow').className='toposcroll '+(running?'':'paused');$('flow').innerHTML='<svg viewBox="0 0 '+w+' '+H+'" xmlns="http://www.w3.org/2000/svg">'+lines.join('')+nodes.join('')+'</svg>';
-let d=$('nodeDetail');if(!selected)return;let {kind,i,j}=selected;if(kind==='partition'&&P[i]){let p=P[i];d.innerHTML='<b dir="ltr">Topic '+p.topic+' / Partition '+p.id+' · Broker '+j+'</b><div class="metricgrid" dir="ltr"><span>Leader: '+p.leader+'</span><span>LEO: '+p.leo+'</span><span>HW: '+p.hw+'</span><span>ISR: '+p.isr.join(', ')+'</span><span>Start: '+p.start+'</span><span>Replica LEO: '+p.offsets[j]+'</span></div>LEO is the next write offset; HW is the readable boundary; ISR is the in-sync replica set.'}else if(kind==='consumer'){let own=P.filter((p,k)=>c&&k%c===i);d.innerHTML='<b>Group '+j+' / Consumer '+i+'</b><br>Assigned: '+own.map(p=>'T'+p.topic+'/P'+p.id).join(', ')+'<br>Lag: '+own.reduce((a,p)=>a+Math.max(0,p.leo-(p.comm[j]??0)),0)+'<br>Each partition has at most one owner per group.'}else d.innerHTML='<b>Producer '+i+'</b><br>acks='+$('acks').value+' · '+read('rate')+' records/s<br>Producers use metadata to locate the partition leader.'}
+
+const topologyViewport = $('flow');
+let topologyZoom = 1;
+let topologyFit = false;
+
+function updateTopologyZoom() {
+  topologyViewport.classList.toggle('fit', topologyFit);
+  topologyViewport.style.setProperty('--topology-zoom', topologyZoom);
+  $('topology-zoom-level').textContent = topologyFit ? 'Fit' : Math.round(topologyZoom * 100) + '%';
+  $('topology-fit').setAttribute('aria-pressed', topologyFit);
+  $('topology-zoom-out').disabled = !topologyFit && topologyZoom === 0.5;
+  $('topology-zoom-in').disabled = !topologyFit && topologyZoom === 2;
+}
+
+function changeTopologyZoom(delta) {
+  if (topologyFit) {
+    topologyZoom = clamp(Math.round(Math.min(1, topologyViewport.clientWidth / 1280) * 4) / 4, 0.5, 1);
+  }
+  topologyZoom = clamp(topologyZoom + delta, 0.5, 2);
+  topologyFit = false;
+  updateTopologyZoom();
+}
+
+$('topology-zoom-out').addEventListener('click', () => changeTopologyZoom(-0.25));
+$('topology-zoom-in').addEventListener('click', () => changeTopologyZoom(0.25));
+$('topology-fit').addEventListener('click', () => {
+  topologyFit = !topologyFit;
+  updateTopologyZoom();
+});
+$('topology-clear').addEventListener('click', () => {
+  selected = null;
+  drawTopology();
+  topologyViewport.focus({preventScroll: true});
+});
+topologyViewport.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && selected) {
+    $('topology-clear').click();
+  } else if (event.target.dataset.topologyNode && ['Enter', ' '].includes(event.key)) {
+    event.preventDefault();
+    event.target.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+  }
+});
+
+function drawTopology() {
+  const consumers = read('consumers');
+  const groups = read('groups');
+  const producers = read('producers');
+  const producing = read('rate') > 0;
+  const consuming = t >= rebalanceUntil && read('consume') > 0;
+  const columns = Math.min(3, B.length);
+  const brokerWidth = 226;
+  const brokerGap = 24;
+  const brokerStart = 255 + (3 - columns) * (brokerWidth + brokerGap) / 2;
+  const brokerPartitions = B.map(broker => P.map((partition, index) => ({partition, index}))
+    .filter(({partition}) => partition.replicas.includes(broker.id)));
+  const brokerHeight = 66 + Math.max(...brokerPartitions.map(partitions => partitions.length)) * 28;
+  const nodeStride = 58;
+  const firstRow = 46;
+  const producerX = 24;
+  const consumerX = 1100;
+  const clientWidth = 156;
+  const height = Math.max(
+    Math.ceil(B.length / columns) * (brokerHeight + 38) + 24,
+    Math.max(producers, consumers * groups) * nodeStride + 70,
+    440
+  );
+  const backgrounds = [];
+  const edges = [];
+  const nodes = [];
+  const locations = P.map(() => []);
+  const markerColors = {produce: '#2dd4bf', consume: '#7dd3fc', replica: '#c4a5ff'};
+  const markers = Object.entries(markerColors).map(([kind, color]) =>
+    '<marker id="topology-' + kind + '" viewBox="0 0 9 8" refX="8" refY="4" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0 L9 4 L0 8 Z" fill="' + color + '"/></marker>'
+  ).join('');
+
+  if (selected?.kind === 'producer' && selected.i >= producers ||
+      selected?.kind === 'consumer' && (selected.i >= consumers || selected.j >= groups)) {
+    selected = null;
+  }
+  const activeNode = document.activeElement?.dataset.topologyNode;
+  const nodeIsSelected = (kind, i, j) => selected?.kind === kind && selected.i === i && selected.j === j;
+  function nodeAttributes(kind, i, j, label, action) {
+    return 'class="svgclick' + (nodeIsSelected(kind, i, j) ? ' selected' : '') +
+      '" data-topology-node="' + kind + '-' + i + '-' + j + '" tabindex="0" role="button" aria-label="' +
+      label + '" onclick="' + action + '"';
+  }
+  function box(x, y, width, title, subtitle, color, attributes) {
+    return '<g ' + attributes + '><rect x="' + x + '" y="' + y + '" width="' + width +
+      '" height="44" rx="8" fill="#15243a" stroke="' + color + '"/>' +
+      '<text x="' + (x + 12) + '" y="' + (y + 18) + '" class="node-title">' + title + '</text>' +
+      '<text x="' + (x + 12) + '" y="' + (y + 35) + '" class="node-subtitle" fill="' + color + '">' +
+      subtitle + '</text></g>';
+  }
+  function connect(kind, from, to, active, matches) {
+    const middle = (from.x + to.x) / 2;
+    const state = selected ? (matches ? ' highlighted' : ' dimmed') : '';
+    const path = 'M' + from.x + ' ' + from.y + ' C' + middle + ' ' + from.y +
+      ' ' + middle + ' ' + to.y + ' ' + to.x + ' ' + to.y;
+    edges.push({highlighted: selected && matches, html: '<path class="edge ' + kind +
+      (active ? ' animated' : '') + state + '" marker-end="url(#topology-' + kind + ')" d="' + path + '"/>'});
+  }
+
+  nodes.push(
+    '<text x="24" y="27" class="lane-label">PRODUCERS</text>',
+    '<text x="' + brokerStart + '" y="27" class="lane-label">BROKERS / PARTITION REPLICAS</text>',
+    '<text x="1100" y="27" class="lane-label">CONSUMERS</text>'
+  );
+  B.forEach((broker, i) => {
+    const x = brokerStart + (i % columns) * (brokerWidth + brokerGap);
+    const y = firstRow + Math.floor(i / columns) * (brokerHeight + 38);
+    const color = broker.online ? '#5eead4' : '#fb7185';
+    backgrounds.push('<rect x="' + x + '" y="' + y + '" width="' + brokerWidth + '" height="' +
+      brokerHeight + '" rx="12" fill="#0c1728" stroke="' + (broker.online ? '#405c7b' : color) + '"/>');
+    nodes.push(box(x + 7, y + 7, brokerWidth - 14, 'Broker ' + i, broker.online ? 'Online' : 'Offline', color,
+      nodeAttributes('broker', i, 0, (broker.online ? 'Stop' : 'Recover') + ' broker ' + i, 'toggle(' + i + ')')));
+    brokerPartitions[i].forEach(({partition, index}, row) => {
+      const top = y + 59 + row * 28;
+      const leader = partition.leader === i;
+      const title = 'T' + partition.topic + ' / P' + partition.id + ' · ' + (leader ? 'Leader' : 'Follower');
+      const attributes = nodeAttributes('partition', index, i, title + ' on broker ' + i,
+        'selectNode(&quot;partition&quot;,' + index + ',' + i + ')');
+      locations[index][i] = {left: x + 8, right: x + brokerWidth - 8, y: top + 12};
+      nodes.push('<g ' + attributes + '><rect x="' + (x + 8) + '" y="' + top + '" width="' +
+        (brokerWidth - 16) + '" height="24" rx="5" fill="' + (leader ? '#473a19' : '#20324a') +
+        '" stroke="' + (leader ? '#fbbf24' : '#405c7b') + '"/><text x="' + (x + 17) + '" y="' +
+        (top + 16) + '" fill="#e2e8f0" font-size="13">' + title + ' · ' + partition.offsets[i] +
+        (partition.isr.includes(i) ? ' ✓' : '') + '</text></g>');
+    });
+  });
+  for (let i = 0; i < producers; i++) {
+    const y = firstRow + i * nodeStride;
+    nodes.push(box(producerX, y, clientWidth, 'Producer ' + i, read('rate') + ' msg/s', '#5eead4',
+      nodeAttributes('producer', i, 0, 'Inspect producer ' + i, 'selectNode(&quot;producer&quot;,' + i + ',0)')));
+    P.forEach((partition, index) => {
+      if (partition.leader === null) return;
+      const leader = locations[index][partition.leader];
+      if (producers <= 5 || index % producers === i || selected?.kind === 'producer' && selected.i === i) {
+        connect('produce', {x: producerX + clientWidth, y: y + 22}, {x: leader.left, y: leader.y},
+          producing, selected?.kind === 'partition' && selected.i === index || nodeIsSelected('producer', i, 0));
+      }
+    });
+  }
+  P.forEach((partition, index) => {
+    if (partition.leader === null) return;
+    const leader = locations[index][partition.leader];
+    const partitionSelected = selected?.kind === 'partition' && selected.i === index;
+    for (const broker of partition.replicas) {
+      if (broker === partition.leader || !B[broker].online) continue;
+      const follower = locations[index][broker];
+      const flowsRight = follower.left >= leader.left;
+      connect('replica', {x: flowsRight ? leader.right : leader.left, y: leader.y},
+        {x: flowsRight ? follower.left : follower.right, y: follower.y}, true, partitionSelected);
+    }
+    for (let group = 0; group < groups; group++) {
+      if (!consumers) continue;
+      const owner = index % consumers;
+      connect('consume', {x: leader.right, y: leader.y},
+        {x: consumerX, y: firstRow + (group * consumers + owner) * nodeStride + 22},
+        consuming, partitionSelected || nodeIsSelected('consumer', owner, group));
+    }
+  });
+  for (let group = 0; group < groups; group++) {
+    for (let i = 0; i < consumers; i++) {
+      const y = firstRow + (group * consumers + i) * nodeStride;
+      const assigned = P.filter((_, index) => index % consumers === i).length;
+      const label = 'Group ' + group + ' / Consumer ' + i;
+      nodes.push(box(consumerX, y, clientWidth, 'G' + group + ' / C' + i,
+        t < rebalanceUntil ? 'Rebalancing' : assigned + ' partitions', '#7dd3fc',
+        nodeAttributes('consumer', i, group, 'Inspect ' + label, 'selectNode(&quot;consumer&quot;,' + i + ',' + group + ')')));
+    }
+  }
+
+  edges.sort((a, b) => Number(a.highlighted) - Number(b.highlighted));
+  topologyViewport.classList.toggle('paused', !running);
+  topologyViewport.innerHTML = '<svg viewBox="0 0 1280 ' + height + '" xmlns="http://www.w3.org/2000/svg"><defs>' +
+    markers + '</defs>' + backgrounds.join('') + edges.map(edge => edge.html).join('') + nodes.join('') + '</svg>';
+  if (activeNode) {
+    const replacement = topologyViewport.querySelector('[data-topology-node="' + activeNode + '"]');
+    (replacement ?? topologyViewport).focus({preventScroll: true});
+  }
+
+  const detail = $('nodeDetail');
+  $('topology-clear').disabled = !selected;
+  if (!selected) {
+    detail.textContent = 'Select a partition, producer, or consumer to inspect its state.';
+    return;
+  }
+  const {kind, i, j} = selected;
+  if (kind === 'partition') {
+    const partition = P[i];
+    detail.innerHTML = '<b>Topic ' + partition.topic + ' / Partition ' + partition.id + ' · Broker ' + j +
+      '</b><div class="metricgrid"><span>Leader: ' + (partition.leader ?? 'none') + '</span><span>LEO: ' +
+      partition.leo + '</span><span>HW: ' + partition.hw + '</span><span>ISR: ' + partition.isr.join(', ') +
+      '</span><span>Start: ' + partition.start + '</span><span>Replica LEO: ' + partition.offsets[j] +
+      '</span></div>LEO is the next write offset; HW is the readable boundary; ISR is the in-sync replica set.';
+  } else if (kind === 'consumer') {
+    const own = P.filter((_, index) => index % consumers === i);
+    detail.innerHTML = '<b>Group ' + j + ' / Consumer ' + i + '</b><br>Assigned: ' +
+      (own.map(partition => 'T' + partition.topic + '/P' + partition.id).join(', ') || 'none') + '<br>Lag: ' +
+      own.reduce((total, partition) => total + Math.max(0, partition.leo - (partition.comm[j] ?? 0)), 0) +
+      '<br>Each partition has at most one owner per group.';
+  } else {
+    detail.innerHTML = '<b>Producer ' + i + '</b><br>acks=' + $('acks').value + ' · ' + read('rate') +
+      ' records/s<br>Producers use metadata to locate the partition leader.';
+  }
+}
 const tabs=[['logs','Partition logs'],['groups','Consumer groups'],['replicas','Replication / ISR'],['internals','Concepts'],['protocol','Protocol flow']];
 $('tabs').innerHTML=tabs.map(([id,l])=>'<button class="tab" id="tab-'+id+'" onclick="tab=\''+id+'\';drawView()">'+l+'</button>').join('');
 function drawView(){tabs.forEach(([id])=>$('tab-'+id).classList.toggle('active',id===tab));let v=$('view');if(tab==='logs')v.innerHTML=P.map(p=>'<div class="partition"><strong>Topic '+p.topic+' / Partition '+p.id+'</strong> <small>LEO '+p.leo+' · HW '+p.hw+' · Start '+p.start+'</small><div class="blocks">'+Array.from({length:Math.min(24,p.leo-p.start)},(_,i)=>{let o=Math.max(p.start,p.leo-24)+i;return '<span class="block '+(o>=p.hw?'pending':o<p.comm[0]?'consumed':'')+'">'+o+'</span>'}).join('')+'</div><small>Green: committed · blue: readable · amber: above HW</small></div>').join('');if(tab==='groups')v.innerHTML=Array.from({length:read('groups')},(_,g)=>'<h3>Group '+g+' · generation '+epoch+'</h3><table><tr><th>Partition</th><th>Owner</th><th>Position</th><th>Commit</th><th>Lag</th></tr>'+P.map((p,i)=>'<tr><td>T'+p.topic+'/P'+p.id+'</td><td>'+(read('consumers')?'C'+i%read('consumers'):'unassigned')+'</td><td>'+p.pos[g]+'</td><td>'+p.comm[g]+'</td><td>'+Math.max(0,p.leo-p.comm[g])+'</td></tr>').join('')+'</table>').join('');if(tab==='replicas')v.innerHTML='<table><tr><th>Partition</th><th>Leader</th><th>ISR</th><th>Replica LEO</th><th>HW</th></tr>'+P.map(p=>'<tr><td>T'+p.topic+'/P'+p.id+'</td><td>'+ (p.leader===null?'NONE':'B'+p.leader)+'</td><td>'+p.isr.join(', ')+'</td><td>'+p.replicas.map(b=>'B'+b+': '+p.offsets[b]).join(' / ')+'</td><td>'+p.hw+'</td></tr>').join('')+'</table>';if(tab==='protocol')v.innerHTML='<div class="hint"><h3>Protocol flow Kafka</h3><div dir="ltr" class="detail">Metadata request · Producer → Controller metadata via Broker<br>Produce request · Producer → Partition Leader<br>Replica Fetch · Follower → Leader<br>Produce response · Leader → Producer (acks)<br>FindCoordinator · Consumer → Broker<br>JoinGroup / SyncGroup · Consumer → Coordinator<br>Fetch · Consumer → Leader (up to HW)<br>OffsetCommit · Consumer → __consumer_offsets</div><h3>ACK versus offset commit</h3><p>ACK confirms a write; offset commit checkpoints consumer progress. Reduce replication speed to observe pending ACKs.</p></div>';if(tab==='internals')v.innerHTML='<div class="hint">'+lessons.map(([h,b])=>'<h3>'+h+'</h3><p>'+b+'</p>').join('')+'</div>'}
